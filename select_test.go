@@ -1,0 +1,44 @@
+package sqlz
+
+import "testing"
+
+func TestSelect(t *testing.T) {
+	runTests(t, func(dbz *DB) []test {
+		return []test{
+			test{
+				"simple select all",
+				dbz.Select("*").From("table"),
+				"SELECT * FROM table",
+				[]interface{}{},
+			},
+
+			test{
+				"simple select all with join",
+				dbz.Select("*").From("table").LeftJoin("left-table", Eq("left-col", Indirect("our-col"))).RightJoin("right-table", Eq("right-col", Indirect("our-col"))),
+				"SELECT * FROM table LEFT JOIN left-table ON left-col = our-col RIGHT JOIN right-table ON right-col = our-col",
+				[]interface{}{},
+			},
+
+			test{
+				"select cols with where clause",
+				dbz.Select("id", "name").From("table").Where(Eq("integer-col", 2), Eq("string-col", "string"), Gt("real-col", 3.2)),
+				"SELECT id, name FROM table WHERE integer-col = ? AND string-col = ? AND real-col > ?",
+				[]interface{}{2, "string", 3.2},
+			},
+
+			test{
+				"select distinct with ordering",
+				dbz.Select("id").Distinct().From("table").OrderBy(Desc("id")),
+				"SELECT DISTINCT id FROM table ORDER BY id DESC",
+				[]interface{}{},
+			},
+
+			test{
+				"select cols with ordering, group by and having",
+				dbz.Select("one", "two").From("table").Where(Like("name", "prefix%"), IsNotNull("nullable-col")).GroupBy("some-id").Having(Gte("MAX(some-int)", 3)).OrderBy(Asc("one"), Desc("two")),
+				"SELECT one, two FROM table WHERE name LIKE ? AND nullable-col IS NOT NULL GROUP BY some-id HAVING MAX(some-int) >= ? ORDER BY one ASC, two DESC",
+				[]interface{}{"prefix%", 3},
+			},
+		}
+	})
+}
