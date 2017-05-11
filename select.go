@@ -1,7 +1,6 @@
 package sqlz
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -33,7 +32,6 @@ type SelectStmt struct {
 	LimitTo         int64
 	OffsetFrom      int64
 	OffsetRows      int64
-	bindings        []interface{}
 	queryer         sqlx.Queryer
 }
 
@@ -78,10 +76,6 @@ func (tx *Tx) Select(cols ...string) *SelectStmt {
 		Columns: append([]string{}, cols...),
 		queryer: tx.Tx,
 	}
-}
-
-func (stmt *SelectStmt) Bindings() []interface{} {
-	return stmt.bindings
 }
 
 func (stmt *SelectStmt) Distinct() *SelectStmt {
@@ -152,13 +146,7 @@ func (stmt *SelectStmt) Offset(start int64, rows ...int64) *SelectStmt {
 	return stmt
 }
 
-func (stmt *SelectStmt) ToSQL() (asSQL string, err error) {
-	if stmt.Table == "" {
-		return asSQL, ErrNoTable
-	}
-
-	stmt.bindings = []interface{}{}
-
+func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"SELECT"}
 
 	if stmt.IsDistinct {
@@ -174,19 +162,15 @@ func (stmt *SelectStmt) ToSQL() (asSQL string, err error) {
 	clauses = append(clauses, "FROM "+stmt.Table)
 
 	for _, join := range stmt.Joins {
-		if len(join.Conditions) == 0 {
-			return asSQL, errors.New("join with no condition")
-		}
-
-		onClause, bindings := parseConditions(join.Conditions)
-		stmt.bindings = append(stmt.bindings, bindings...)
+		onClause, joinBindings := parseConditions(join.Conditions)
+		bindings = append(bindings, joinBindings...)
 
 		clauses = append(clauses, join.Type.String()+" "+join.Table+" ON "+onClause)
 	}
 
 	if len(stmt.Conditions) > 0 {
-		whereClause, bindings := parseConditions(stmt.Conditions)
-		stmt.bindings = append(stmt.bindings, bindings...)
+		whereClause, whereBindings := parseConditions(stmt.Conditions)
+		bindings = append(bindings, whereBindings...)
 		clauses = append(clauses, "WHERE "+whereClause)
 	}
 
@@ -195,8 +179,8 @@ func (stmt *SelectStmt) ToSQL() (asSQL string, err error) {
 	}
 
 	if len(stmt.GroupConditions) > 0 {
-		groupByClause, bindings := parseConditions(stmt.GroupConditions)
-		stmt.bindings = append(stmt.bindings, bindings...)
+		groupByClause, groupBindings := parseConditions(stmt.GroupConditions)
+		bindings = append(bindings, groupBindings...)
 		clauses = append(clauses, "HAVING "+groupByClause)
 	}
 
@@ -221,31 +205,26 @@ func (stmt *SelectStmt) ToSQL() (asSQL string, err error) {
 	}
 
 	asSQL = strings.Join(clauses, " ")
-	if db, ok := stmt.queryer.(*sqlx.DB); ok {
-		asSQL = db.Rebind(asSQL)
-	} else if tx, ok := stmt.queryer.(*sqlx.Tx); ok {
-		asSQL = tx.Rebind(asSQL)
+
+	if rebind {
+		if db, ok := stmt.queryer.(*sqlx.DB); ok {
+			asSQL = db.Rebind(asSQL)
+		} else if tx, ok := stmt.queryer.(*sqlx.Tx); ok {
+			asSQL = tx.Rebind(asSQL)
+		}
 	}
 
-	return asSQL, nil
+	return asSQL, bindings
 }
 
 func (stmt *SelectStmt) GetRow(into interface{}) error {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return err
-	}
-
-	return sqlx.Get(stmt.queryer, into, asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Get(stmt.queryer, into, asSQL, bindings...)
 }
 
 func (stmt *SelectStmt) GetAll(into interface{}) error {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return err
-	}
-
-	return sqlx.Select(stmt.queryer, into, asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Select(stmt.queryer, into, asSQL, bindings...)
 }
 
 func (stmt *SelectStmt) GetCount() (count int64, err error) {

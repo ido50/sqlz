@@ -8,15 +8,14 @@ import (
 )
 
 type toSQLer interface {
-	ToSQL() (string, error)
-	Bindings() []interface{}
+	ToSQL(bool) (string, []interface{})
 }
 
 type test struct {
-	name     string
-	stmt     toSQLer
-	expected string
-	bindings []interface{}
+	name             string
+	stmt             toSQLer
+	expectedSQL      string
+	expectedBindings []interface{}
 }
 
 func runTests(t *testing.T, source func(dbz *DB) []test) {
@@ -26,19 +25,17 @@ func runTests(t *testing.T, source func(dbz *DB) []test) {
 	}
 
 	for _, tst := range source(Newx(dbx)) {
-		sql, err := tst.stmt.ToSQL()
-		if err != nil {
-			t.Errorf("Failed %s: %s", tst.name, err)
-		} else if sql != tst.expected {
-			t.Errorf("Failed %s: expected %s, got %s", tst.name, tst.expected, sql)
+		resultingSQL, resultingBindings := tst.stmt.ToSQL(true)
+		if resultingSQL != tst.expectedSQL {
+			t.Errorf("Failed %s: expected %s, got %s", tst.name, tst.expectedSQL, resultingSQL)
 		}
 
-		if len(tst.bindings) != len(tst.stmt.Bindings()) {
-			t.Errorf("Failed %s: expected %d bindings, got %d", tst.name, len(tst.bindings), len(tst.stmt.Bindings()))
+		if len(tst.expectedBindings) != len(resultingBindings) {
+			t.Errorf("Failed %s: expected %d bindings, got %d", tst.name, len(tst.expectedBindings), len(resultingBindings))
 		} else {
-			for i := range tst.bindings {
-				if tst.bindings[i] != tst.stmt.Bindings()[i] {
-					t.Errorf("Failed %s: expected binding %d to be %v, got %v", tst.name, i+1, tst.bindings[i], tst.stmt.Bindings()[i])
+			for i := range tst.expectedBindings {
+				if tst.expectedBindings[i] != resultingBindings[i] {
+					t.Errorf("Failed %s: expected binding %d to be %v, got %v", tst.name, i+1, tst.expectedBindings[i], resultingBindings[i])
 				}
 			}
 		}

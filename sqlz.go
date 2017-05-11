@@ -2,13 +2,10 @@ package sqlz
 
 import (
 	"database/sql"
-	"errors"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
-
-var ErrNoTable = errors.New("no table in query")
 
 type DB struct {
 	*sqlx.DB
@@ -59,6 +56,11 @@ type AndOrCondition struct {
 type SimpleCondition struct {
 	Left     string
 	Right    interface{}
+	Operator string
+}
+
+type SubqueryCondition struct {
+	Stmt     *SelectStmt
 	Operator string
 }
 
@@ -118,6 +120,14 @@ func IsNotNull(col string) SimpleCondition {
 	return SimpleCondition{col, nil, "IS NOT NULL"}
 }
 
+func Exists(stmt *SelectStmt) SubqueryCondition {
+	return SubqueryCondition{stmt, "EXISTS"}
+}
+
+func NotExists(stmt *SelectStmt) SubqueryCondition {
+	return SubqueryCondition{stmt, "NOT EXISTS"}
+}
+
 func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 	asSQL = simple.Left + " " + simple.Operator
 
@@ -146,6 +156,11 @@ func (andOr AndOrCondition) Parse() (asSQL string, bindings []interface{}) {
 		op = " OR "
 	}
 	return "(" + strings.Join(sqls, op) + ")", bindings
+}
+
+func (subCond SubqueryCondition) Parse() (asSQL string, bindings []interface{}) {
+	asSQL, bindings = subCond.Stmt.ToSQL(false)
+	return subCond.Operator + " (" + asSQL + ")", bindings
 }
 
 func parseConditions(conds []WhereCondition) (asSQL string, bindings []interface{}) {

@@ -2,7 +2,6 @@ package sqlz
 
 import (
 	"database/sql"
-	"errors"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -13,7 +12,6 @@ type UpdateStmt struct {
 	Updates    map[string]interface{}
 	Conditions []WhereCondition
 	Return     []string
-	bindings   []interface{}
 	execer     sqlx.Ext
 }
 
@@ -27,13 +25,10 @@ func (db *DB) Update(table string) *UpdateStmt {
 
 func (tx *Tx) Update(table string) *UpdateStmt {
 	return &UpdateStmt{
-		Table:  table,
-		execer: tx.Tx,
+		Table:   table,
+		Updates: make(map[string]interface{}),
+		execer:  tx.Tx,
 	}
-}
-
-func (stmt *UpdateStmt) Bindings() []interface{} {
-	return stmt.bindings
 }
 
 func (stmt *UpdateStmt) Set(col string, value interface{}) *UpdateStmt {
@@ -58,32 +53,25 @@ func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 	return stmt
 }
 
-var ErrNoUpdates = errors.New("no updates provided")
-
-func (stmt *UpdateStmt) ToSQL() (asSQL string, err error) {
-	if stmt.Table == "" {
-		return asSQL, ErrNoTable
-	}
-	if len(stmt.Updates) == 0 {
-		return asSQL, ErrNoUpdates
-	}
-
-	stmt.bindings = []interface{}{}
-
+func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"UPDATE " + stmt.Table}
 
 	var updates []string
 
 	for col, val := range stmt.Updates {
-		updates = append(updates, col+" = ?")
-		stmt.bindings = append(stmt.bindings, val)
+		if indirect, isIndirect := val.(IndirectValue); isIndirect {
+			updates = append(updates, col+" = "+indirect.Reference)
+		} else {
+			updates = append(updates, col+" = ?")
+			bindings = append(bindings, val)
+		}
 	}
 
 	clauses = append(clauses, "SET "+strings.Join(updates, ", "))
 
 	if len(stmt.Conditions) > 0 {
-		whereClause, bindings := parseConditions(stmt.Conditions)
-		stmt.bindings = append(stmt.bindings, bindings...)
+		whereClause, whereBindings := parseConditions(stmt.Conditions)
+		bindings = append(bindings, whereBindings...)
 		clauses = append(clauses, "WHERE "+whereClause)
 	}
 
@@ -98,32 +86,20 @@ func (stmt *UpdateStmt) ToSQL() (asSQL string, err error) {
 		asSQL = tx.Rebind(asSQL)
 	}
 
-	return asSQL, nil
+	return asSQL, bindings
 }
 
 func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return res, err
-	}
-
-	return stmt.execer.Exec(asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.Exec(asSQL, bindings...)
 }
 
 func (stmt *UpdateStmt) GetRow(into interface{}) error {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return err
-	}
-
-	return sqlx.Get(stmt.execer, into, asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return err
-	}
-
-	return sqlx.Select(stmt.execer, into, asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
 }

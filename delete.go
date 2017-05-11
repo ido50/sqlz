@@ -10,7 +10,6 @@ import (
 type DeleteStmt struct {
 	Table      string
 	Conditions []WhereCondition
-	bindings   []interface{}
 	execer     sqlx.Execer
 }
 
@@ -28,27 +27,17 @@ func (tx *Tx) DeleteFrom(table string) *DeleteStmt {
 	}
 }
 
-func (stmt *DeleteStmt) Bindings() []interface{} {
-	return stmt.bindings
-}
-
 func (stmt *DeleteStmt) Where(conds ...WhereCondition) *DeleteStmt {
 	stmt.Conditions = append(stmt.Conditions, conds...)
 	return stmt
 }
 
-func (stmt *DeleteStmt) ToSQL() (asSQL string, err error) {
-	if stmt.Table == "" {
-		return asSQL, ErrNoTable
-	}
-
-	stmt.bindings = []interface{}{}
-
+func (stmt *DeleteStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"DELETE FROM " + stmt.Table}
 
 	if len(stmt.Conditions) > 0 {
-		whereClause, bindings := parseConditions(stmt.Conditions)
-		stmt.bindings = append(stmt.bindings, bindings...)
+		whereClause, whereBindings := parseConditions(stmt.Conditions)
+		bindings = append(bindings, whereBindings...)
 		clauses = append(clauses, "WHERE "+whereClause)
 	}
 
@@ -59,14 +48,10 @@ func (stmt *DeleteStmt) ToSQL() (asSQL string, err error) {
 		asSQL = tx.Rebind(asSQL)
 	}
 
-	return asSQL, nil
+	return asSQL, bindings
 }
 
 func (stmt *DeleteStmt) Exec() (res sql.Result, err error) {
-	asSQL, err := stmt.ToSQL()
-	if err != nil {
-		return res, err
-	}
-
-	return stmt.execer.Exec(asSQL, stmt.bindings...)
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.Exec(asSQL, bindings...)
 }
