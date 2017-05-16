@@ -38,6 +38,7 @@ type SelectStmt struct {
 type JoinClause struct {
 	Type       JoinType
 	Table      string
+	ResultSet  *SelectStmt
 	Conditions []WhereCondition
 }
 
@@ -88,29 +89,46 @@ func (stmt *SelectStmt) From(table string) *SelectStmt {
 	return stmt
 }
 
-func (stmt *SelectStmt) Join(joinType JoinType, table string, conds ...WhereCondition) *SelectStmt {
+func (stmt *SelectStmt) Join(joinType JoinType, table string, resultSet *SelectStmt, conds ...WhereCondition) *SelectStmt {
 	stmt.Joins = append(stmt.Joins, JoinClause{
 		Type:       joinType,
 		Table:      table,
+		ResultSet:  resultSet,
 		Conditions: append([]WhereCondition{}, conds...),
 	})
 	return stmt
 }
 
 func (stmt *SelectStmt) LeftJoin(table string, conds ...WhereCondition) *SelectStmt {
-	return stmt.Join(LeftJoin, table, conds...)
+	return stmt.Join(LeftJoin, table, nil, conds...)
 }
 
 func (stmt *SelectStmt) RightJoin(table string, conds ...WhereCondition) *SelectStmt {
-	return stmt.Join(RightJoin, table, conds...)
+	return stmt.Join(RightJoin, table, nil, conds...)
 }
 
 func (stmt *SelectStmt) InnerJoin(table string, conds ...WhereCondition) *SelectStmt {
-	return stmt.Join(InnerJoin, table, conds...)
+	return stmt.Join(InnerJoin, table, nil, conds...)
 }
 
 func (stmt *SelectStmt) FullJoin(table string, conds ...WhereCondition) *SelectStmt {
-	return stmt.Join(FullJoin, table, conds...)
+	return stmt.Join(FullJoin, table, nil, conds...)
+}
+
+func (stmt *SelectStmt) LeftJoinRS(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
+	return stmt.Join(LeftJoin, as, rs, conds...)
+}
+
+func (stmt *SelectStmt) RightJoinRS(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
+	return stmt.Join(RightJoin, as, rs, conds...)
+}
+
+func (stmt *SelectStmt) InnerJoinRS(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
+	return stmt.Join(InnerJoin, as, rs, conds...)
+}
+
+func (stmt *SelectStmt) FullJoinRS(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
+	return stmt.Join(FullJoin, as, rs, conds...)
 }
 
 func (stmt *SelectStmt) Where(conditions ...WhereCondition) *SelectStmt {
@@ -163,9 +181,19 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 
 	for _, join := range stmt.Joins {
 		onClause, joinBindings := parseConditions(join.Conditions)
-		bindings = append(bindings, joinBindings...)
 
-		clauses = append(clauses, join.Type.String()+" "+join.Table+" ON "+onClause)
+		if join.ResultSet != nil {
+			rsSQL, rsBindings := join.ResultSet.ToSQL(false)
+			clauses = append(clauses, join.Type.String()+" ("+rsSQL+") "+join.Table+" ON "+onClause)
+			bindings = append(bindings, rsBindings...)
+		} else {
+			clauses = append(clauses, join.Type.String()+" "+join.Table+" ON "+onClause)
+		}
+
+		// add the join condition bindings (this MUST happen after adding the clause
+		// itself, because if the join is on a result set then the result set's bindings
+		// need to come first
+		bindings = append(bindings, joinBindings...)
 	}
 
 	if len(stmt.Conditions) > 0 {

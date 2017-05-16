@@ -39,6 +39,17 @@ func TestSelect(t *testing.T) {
 				"SELECT one, two FROM table WHERE name LIKE ? AND nullable-col IS NOT NULL GROUP BY some-id HAVING MAX(some-int) >= ? ORDER BY one ASC, two DESC",
 				[]interface{}{"prefix%", 3},
 			},
+
+			test{
+				"select with a join on another select",
+				dbz.Select("a.id, a.value").From("table a").Where(Eq("a.id", 1)).InnerJoinRS(
+					dbz.Select("id, MAX(value) value").From("table").GroupBy("id"),
+					"b",
+					Eq("a.id", Indirect("b.id")),
+				),
+				"SELECT a.id, a.value FROM table a INNER JOIN (SELECT id, MAX(value) value FROM table GROUP BY id) b ON a.id = b.id WHERE a.id = ?",
+				[]interface{}{1},
+			},
 		}
 	})
 }
