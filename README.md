@@ -273,6 +273,11 @@ replaced with placeholders, use the Indirect function:
  - To increase a column in a SET clause, use `sqlz.Set("int-column", sqlz.Indirect("int-column + 1"))`
  - To set a columm using a database function (e.g. `LOCALTIMESTAMP`), use `sqlz.Set("datetime", sqlz.Indirect("LOCALTIMESTAMP"))`
 
+## Dependencies
+
+The only non-standard library package used is [jmoiron/sqlx](https://github.com/jmoiron/sqlx).
+The test suite, however, uses [DATA-DOG/sqlmock](https://github.com/DATA-DOG/sqlmock).
+
 ## Acknowledgments
 
 sqlz was inspired by [gocraft/dbr](https://github.com/gocraft/dbr).
