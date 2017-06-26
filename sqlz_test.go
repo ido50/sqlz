@@ -3,8 +3,7 @@ package sqlz
 import (
 	"testing"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
 type toSQLer interface {
@@ -19,12 +18,12 @@ type test struct {
 }
 
 func runTests(t *testing.T, source func(dbz *DB) []test) {
-	dbx, err := sqlx.Connect("sqlite3", ":memory:")
+	db, _, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("Failed connecting to DB: %s", err)
+		t.Fatalf("Failed creating mock database: %s", err)
 	}
 
-	for _, tst := range source(Newx(dbx)) {
+	for _, tst := range source(New(db, "sqlmock")) {
 		resultingSQL, resultingBindings := tst.stmt.ToSQL(true)
 		if resultingSQL != tst.expectedSQL {
 			t.Errorf("Failed %s: expected %s, got %s", tst.name, tst.expectedSQL, resultingSQL)
