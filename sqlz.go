@@ -128,6 +128,17 @@ func NotExists(stmt *SelectStmt) SubqueryCondition {
 	return SubqueryCondition{stmt, "NOT EXISTS"}
 }
 
+// JSONBOp creates simple conditions with JSONB operators for
+// PostgreSQL databases (supported operators are "@>", "<@",
+// "?", "?!", "?&", "||", "=" and "#-")
+func JSONBOp(op string, left string, value interface{}) SimpleCondition {
+	switch op {
+	case "@>", "<@", "?", "?!", "?&", "||", "-", "#-":
+		return SimpleCondition{left, value, op}
+	default:
+		return SimpleCondition{}
+	}
+}
 func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 	asSQL = simple.Left + " " + simple.Operator
 
