@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// UpdateStmt represents an UPDATE statement
 type UpdateStmt struct {
 	Table      string
 	Updates    map[string]interface{}
@@ -15,6 +16,8 @@ type UpdateStmt struct {
 	execer     sqlx.Ext
 }
 
+// Update creates a new UpdateStmt object for
+// the specified table
 func (db *DB) Update(table string) *UpdateStmt {
 	return &UpdateStmt{
 		Table:   table,
@@ -23,6 +26,8 @@ func (db *DB) Update(table string) *UpdateStmt {
 	}
 }
 
+// Update creates a new UpdateStmt object for
+// the specified table
 func (tx *Tx) Update(table string) *UpdateStmt {
 	return &UpdateStmt{
 		Table:   table,
@@ -31,11 +36,16 @@ func (tx *Tx) Update(table string) *UpdateStmt {
 	}
 }
 
+// Set receives the name of a column and a new value. Multiple calls to Set
+// can be chained together to modify multiple columns. Set can also be chained
+// with calls to SetMap
 func (stmt *UpdateStmt) Set(col string, value interface{}) *UpdateStmt {
 	stmt.Updates[col] = value
 	return stmt
 }
 
+// SetMap receives a map of columns and values. Multiple calls to both Set and
+// SetMap can be chained to modify multiple columns.
 func (stmt *UpdateStmt) SetMap(updates map[string]interface{}) *UpdateStmt {
 	for col, value := range updates {
 		stmt.Updates[col] = value
@@ -43,16 +53,25 @@ func (stmt *UpdateStmt) SetMap(updates map[string]interface{}) *UpdateStmt {
 	return stmt
 }
 
+// Where creates one or more WHERE conditions for the UPDATE statement.
+// If multiple conditions are passed, they are considered AND conditions.
 func (stmt *UpdateStmt) Where(conditions ...WhereCondition) *UpdateStmt {
 	stmt.Conditions = append(stmt.Conditions, conditions...)
 	return stmt
 }
 
+// Returning sets a RETURNING clause to receive values back from the
+// database once executing the UPDATE statement. Note that GetRow or
+// GetAll must be used to execute the query rather than Exec to get
+// back the values.
 func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 	stmt.Return = append(stmt.Return, cols...)
 	return stmt
 }
 
+// ToSQL generates the UPDATE statement's SQL and returns a list of
+// bindings. It is used internally by Exec, GetRow and GetAll, but is
+// exported if you wish to use it directly.
 func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"UPDATE " + stmt.Table}
 
@@ -89,16 +108,26 @@ func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	return asSQL, bindings
 }
 
+// Exec executes the UPDATE statement, returning the standard
+// sql.Result struct and an error if the query failed.
 func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	return stmt.execer.Exec(asSQL, bindings...)
 }
 
+// GetRow executes an UPDATE statement with a RETURNING clause
+// expected to return one row, and loads the result into
+// the provided variable (which may be a simple variable if
+// only one column is returned, or a struct if multiple columns
+// are returned)
 func (stmt *UpdateStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
+// GetAll executes an UPDATE statement with a RETURNING clause
+// expected to return multiple rows, and loads the result into
+// the provided slice variable
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
