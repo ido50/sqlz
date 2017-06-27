@@ -125,7 +125,7 @@ err = sqlz.New(db, driver).
 Generated SQL (disregarding placeholders):
 
 ```sql
-        SELECT MAX(t.col1) maxVal, SUM(t.col2) sumCount
+      SELECT MAX(t.col1) maxVal, SUM(t.col2) sumCount
         FROM some-table t
    LEFT JOIN other-table o ON o.id = t.id
        WHERE t.col3 = 5 OR t.col4 IS NOT NULL
@@ -133,7 +133,7 @@ Generated SQL (disregarding placeholders):
       HAVING maxVal > 3
     ORDER BY maxVal DESC, sumCount ASC
        LIMIT 5
-      OFFSET 10, 20
+      OFFSET 10
 ```
 
 When paginating results, sqlz provides a nice feature to also calculate the
