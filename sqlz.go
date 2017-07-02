@@ -4,6 +4,7 @@ package sqlz
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -38,17 +39,22 @@ func Newx(db *sqlx.DB) *DB {
 func (db *DB) Transactional(f func(tx *Tx) error) error {
 	tx, err := db.Beginx()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed starting transaction: %s", err)
 	}
 
 	err = f(&Tx{tx})
 	if err != nil {
-		return tx.Rollback()
+		rErr := tx.Rollback()
+		err = fmt.Errorf("transaction failed: %s", err)
+		if rErr != nil {
+			err = fmt.Errorf("%s (rollback failed: %s)", err, rErr)
+		}
+		return err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return tx.Rollback()
+		return fmt.Errorf("failed committing transaction: %s", err)
 	}
 
 	return nil
