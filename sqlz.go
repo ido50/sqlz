@@ -240,5 +240,9 @@ func parseConditions(conds []WhereCondition) (asSQL string, bindings []interface
 		asSQL, bindings = conds[0].Parse()
 	}
 
-	return strings.TrimPrefix(strings.TrimSuffix(asSQL, ")"), "("), bindings
+	if strings.HasPrefix(asSQL, "(") {
+		asSQL = strings.TrimPrefix(strings.TrimSuffix(asSQL, ")"), "(")
+	}
+
+	return asSQL, bindings
 }
