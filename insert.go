@@ -9,11 +9,12 @@ import (
 
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
-	InsCols []string
-	InsVals []interface{}
-	Table   string
-	Return  []string
-	execer  sqlx.Ext
+	InsCols             []string
+	InsVals             []interface{}
+	Table               string
+	Return              []string
+	onConflictDoNothing bool
+	execer              sqlx.Ext
 }
 
 // InsertInto creates a new InsertStmt object for the
@@ -67,6 +68,12 @@ func (stmt *InsertStmt) Returning(cols ...string) *InsertStmt {
 	return stmt
 }
 
+// OnConflictDoNothing sets an ON CONFLICT clause on the statement,
+func (stmt *InsertStmt) OnConflictDoNothing() *InsertStmt {
+	stmt.onConflictDoNothing = true
+	return stmt
+}
+
 // ToSQL generates the INSERT statement's SQL and returns a list of
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
@@ -84,6 +91,10 @@ func (stmt *InsertStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 		}
 
 		clauses = append(clauses, "VALUES ("+strings.Join(placeholders, ", ")+")")
+	}
+
+	if stmt.onConflictDoNothing {
+		clauses = append(clauses, "ON CONFLICT DO NOTHING")
 	}
 
 	if len(stmt.Return) > 0 {

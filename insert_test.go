@@ -25,6 +25,13 @@ func TestInsert(t *testing.T) {
 				"INSERT INTO table (one, two) VALUES (?, ?) RETURNING id",
 				[]interface{}{1, 2},
 			},
+
+			test{
+				"insert with on conflict do nothing clause",
+				dbz.InsertInto("table").Columns("one", "two").Values(1, 2).OnConflictDoNothing(),
+				"INSERT INTO table (one, two) VALUES (?, ?) ON CONFLICT DO NOTHING",
+				[]interface{}{1, 2},
+			},
 		}
 	})
 }
