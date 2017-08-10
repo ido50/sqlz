@@ -32,6 +32,13 @@ func TestUpdate(t *testing.T) {
 				"UPDATE table SET something = ? WHERE id = ? RETURNING something-else",
 				[]interface{}{nil, 123},
 			},
+
+			test{
+				"update with update functions",
+				dbz.Update("table").Set("something", 3).Set("things", ArrayAppend("things", "asdf")),
+				"UPDATE table SET something = ?, things = array_append(things, ?)",
+				[]interface{}{3, "asdf"},
+			},
 		}
 	})
 }

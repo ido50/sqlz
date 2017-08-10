@@ -78,7 +78,18 @@ func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	var updates []string
 
 	for col, val := range stmt.Updates {
-		if indirect, isIndirect := val.(IndirectValue); isIndirect {
+		if fn, isFn := val.(UpdateFunction); isFn {
+			var args []string
+			for _, arg := range fn.Arguments {
+				if indirect, isIndirect := arg.(IndirectValue); isIndirect {
+					args = append(args, indirect.Reference)
+				} else {
+					args = append(args, "?")
+					bindings = append(bindings, arg)
+				}
+			}
+			updates = append(updates, col+" = "+fn.Name+"("+strings.Join(args, ", ")+")")
+		} else if indirect, isIndirect := val.(IndirectValue); isIndirect {
 			updates = append(updates, col+" = "+indirect.Reference)
 		} else {
 			updates = append(updates, col+" = ?")
@@ -131,4 +142,40 @@ func (stmt *UpdateStmt) GetRow(into interface{}) error {
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+}
+
+// UpdateFunction represents a function call in the context of
+// updating a column's value. For example, PostgreSQL provides
+// functions to append, prepend or remove items from array
+// columns.
+type UpdateFunction struct {
+	Name      string
+	Arguments []interface{}
+}
+
+// ArrayAppend is an UpdateFunction for calling PostgreSQL's
+// array_append function during an update.
+func ArrayAppend(name string, value interface{}) UpdateFunction {
+	return UpdateFunction{
+		Name:      "array_append",
+		Arguments: []interface{}{Indirect(name), value},
+	}
+}
+
+// ArrayPrepend is an UpdateFunction for calling PostgreSQL's
+// array_prepend function during an update.
+func ArrayPrepend(name string, value interface{}) UpdateFunction {
+	return UpdateFunction{
+		Name:      "array_prepend",
+		Arguments: []interface{}{Indirect(name), value},
+	}
+}
+
+// ArrayRemove is an UpdateFunction for calling PostgreSQL's
+// array_remove function during an update.
+func ArrayRemove(name string, value interface{}) UpdateFunction {
+	return UpdateFunction{
+		Name:      "array_remove",
+		Arguments: []interface{}{Indirect(name), value},
+	}
 }
