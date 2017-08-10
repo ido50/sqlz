@@ -50,6 +50,13 @@ func TestSelect(t *testing.T) {
 				"SELECT a.id, a.value FROM table a INNER JOIN (SELECT id, MAX(value) value FROM table GROUP BY id) b ON a.id = b.id WHERE a.id = ?",
 				[]interface{}{1},
 			},
+
+			test{
+				"select with array comparisons",
+				dbz.Select("*").From("table").Where(EqAny("array_col", 3), GtAll("other_array_col", 1), NeAny("yet_another_col", Indirect("NOW()"))),
+				"SELECT * FROM table WHERE ? = ANY(array_col) AND ? > ALL(other_array_col) AND NOW() <> ANY(yet_another_col)",
+				[]interface{}{3, 1},
+			},
 		}
 	})
 }

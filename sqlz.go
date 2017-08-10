@@ -198,6 +198,74 @@ func JSONBOp(op string, left string, value interface{}) SimpleCondition {
 	}
 }
 
+// ArrayCondition represents an array comparison condition
+type ArrayCondition struct {
+	Left     interface{}
+	Operator string
+	Type     string
+	Right    string
+}
+
+// EqAny creates an "= ANY" condition on an array column
+func EqAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "=", "ANY", col}
+}
+
+// NeAny creates an "<> ANY" condition on an array column
+func NeAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<>", "ANY", col}
+}
+
+// LtAny creates an "< ANY" condition on an array column
+func LtAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<", "ANY", col}
+}
+
+// LteAny creates an "<= ANY" condition on an array column
+func LteAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<=", "ANY", col}
+}
+
+// GtAny creates an "> ANY" condition on an array column
+func GtAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">", "ANY", col}
+}
+
+// GteAny creates an ">= ANY" condition on an array column
+func GteAny(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">=", "ANY", col}
+}
+
+// EqAll creates an "= ALL" condition on an array column
+func EqAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "=", "ALL", col}
+}
+
+// NeAll creates an "<> ALL" condition on an array column
+func NeAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<>", "ALL", col}
+}
+
+// LtAll creates an "< ALL" condition on an array column
+func LtAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<", "ALL", col}
+}
+
+// LteAll creates an "<= ALL" condition on an array column
+func LteAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<=", "ALL", col}
+}
+
+// GtAll creates an "> ALL" condition on an array column
+func GtAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">", "ALL", col}
+}
+
+// GteAll creates an ">= ALL" condition on an array column
+func GteAll(col string, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">=", "ALL", col}
+}
+
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
@@ -212,6 +280,20 @@ func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 		}
 		asSQL += " " + placeholder
 	}
+
+	return asSQL, bindings
+}
+
+// Parse implements the WhereCondition interface, generating SQL from
+// the condition
+func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
+	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
+		asSQL = indirect.Reference
+	} else {
+		asSQL = "?"
+		bindings = append(bindings, array.Left)
+	}
+	asSQL += " " + array.Operator + " " + array.Type + "(" + array.Right + ")"
 
 	return asSQL, bindings
 }
