@@ -6,13 +6,9 @@ import (
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
-type toSQLer interface {
-	ToSQL(bool) (string, []interface{})
-}
-
 type test struct {
 	name             string
-	stmt             toSQLer
+	stmt             SQLStmt
 	expectedSQL      string
 	expectedBindings []interface{}
 }

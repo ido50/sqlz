@@ -20,6 +20,13 @@ type Tx struct {
 	*sqlx.Tx
 }
 
+// SQLStmt is an interface representing a general SQL statement. All
+// specific statement types (e.g. SelectStmt, UpdateStmt, etc.)
+// implement this interface
+type SQLStmt interface {
+	ToSQL(bool) (string, []interface{})
+}
+
 // New creates a new DB instance from an underlying sql.DB object.
 // It requires the name of the SQL driver in order to use the correct
 // placeholders when generating SQL

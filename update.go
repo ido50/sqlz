@@ -72,7 +72,7 @@ func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 // ToSQL generates the UPDATE statement's SQL and returns a list of
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
-func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
+func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"UPDATE " + stmt.Table}
 
 	var updates []string
@@ -110,10 +110,13 @@ func (stmt *UpdateStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	}
 
 	asSQL = strings.Join(clauses, " ")
-	if db, ok := stmt.execer.(*sqlx.DB); ok {
-		asSQL = db.Rebind(asSQL)
-	} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
-		asSQL = tx.Rebind(asSQL)
+
+	if rebind {
+		if db, ok := stmt.execer.(*sqlx.DB); ok {
+			asSQL = db.Rebind(asSQL)
+		} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
+			asSQL = tx.Rebind(asSQL)
+		}
 	}
 
 	return asSQL, bindings

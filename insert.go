@@ -77,7 +77,7 @@ func (stmt *InsertStmt) OnConflictDoNothing() *InsertStmt {
 // ToSQL generates the INSERT statement's SQL and returns a list of
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
-func (stmt *InsertStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
+func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"INSERT INTO " + stmt.Table}
 
 	if len(stmt.InsCols) > 0 {
@@ -86,8 +86,13 @@ func (stmt *InsertStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 
 	if len(stmt.InsVals) > 0 {
 		var placeholders []string
-		for range stmt.InsVals {
-			placeholders = append(placeholders, "?")
+		for _, val := range stmt.InsVals {
+			if indirect, isIndirect := val.(IndirectValue); isIndirect {
+				placeholders = append(placeholders, indirect.Reference)
+			} else {
+				placeholders = append(placeholders, "?")
+				bindings = append(bindings, val)
+			}
 		}
 
 		clauses = append(clauses, "VALUES ("+strings.Join(placeholders, ", ")+")")
@@ -102,13 +107,16 @@ func (stmt *InsertStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	}
 
 	asSQL = strings.Join(clauses, " ")
-	if db, ok := stmt.execer.(*sqlx.DB); ok {
-		asSQL = db.Rebind(asSQL)
-	} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
-		asSQL = tx.Rebind(asSQL)
+
+	if rebind {
+		if db, ok := stmt.execer.(*sqlx.DB); ok {
+			asSQL = db.Rebind(asSQL)
+		} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
+			asSQL = tx.Rebind(asSQL)
+		}
 	}
 
-	return asSQL, stmt.InsVals
+	return asSQL, bindings
 }
 
 // Exec executes the INSERT statement, returning the standard

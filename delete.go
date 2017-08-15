@@ -42,7 +42,7 @@ func (stmt *DeleteStmt) Where(conds ...WhereCondition) *DeleteStmt {
 // ToSQL generates the DELETE statement's SQL and returns a list of
 // bindings. It is used internally by Exec, but is exported if you
 // wish to use it directly.
-func (stmt *DeleteStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
+func (stmt *DeleteStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"DELETE FROM " + stmt.Table}
 
 	if len(stmt.Conditions) > 0 {
@@ -52,10 +52,13 @@ func (stmt *DeleteStmt) ToSQL(_ bool) (asSQL string, bindings []interface{}) {
 	}
 
 	asSQL = strings.Join(clauses, " ")
-	if db, ok := stmt.execer.(*sqlx.DB); ok {
-		asSQL = db.Rebind(asSQL)
-	} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
-		asSQL = tx.Rebind(asSQL)
+
+	if rebind {
+		if db, ok := stmt.execer.(*sqlx.DB); ok {
+			asSQL = db.Rebind(asSQL)
+		} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
+			asSQL = tx.Rebind(asSQL)
+		}
 	}
 
 	return asSQL, bindings
