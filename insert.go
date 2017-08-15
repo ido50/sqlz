@@ -11,6 +11,7 @@ import (
 type InsertStmt struct {
 	InsCols             []string
 	InsVals             []interface{}
+	SelectStmt          *SelectStmt
 	Table               string
 	Return              []string
 	onConflictDoNothing bool
@@ -59,6 +60,13 @@ func (stmt *InsertStmt) ValueMap(vals map[string]interface{}) *InsertStmt {
 	return stmt
 }
 
+// Select sets a SELECT statements that will supply the rows
+// to be inserted.
+func (stmt *InsertStmt) FromSelect(selStmt *SelectStmt) *InsertStmt {
+	stmt.SelectStmt = selStmt
+	return stmt
+}
+
 // Returning sets a RETURNING clause to receive values back from the
 // database once executing the INSERT statement. Note that GetRow or
 // GetAll must be used to execute the query rather than Exec to get
@@ -84,7 +92,11 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		clauses = append(clauses, "("+strings.Join(stmt.InsCols, ", ")+")")
 	}
 
-	if len(stmt.InsVals) > 0 {
+	if stmt.SelectStmt != nil {
+		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
+		clauses = append(clauses, selectSQL)
+		bindings = append(bindings, selectBindings...)
+	} else if len(stmt.InsVals) > 0 {
 		var placeholders []string
 		for _, val := range stmt.InsVals {
 			if indirect, isIndirect := val.(IndirectValue); isIndirect {

@@ -32,6 +32,15 @@ func TestInsert(t *testing.T) {
 				"INSERT INTO table (one, two) VALUES (?, ?) ON CONFLICT DO NOTHING",
 				[]interface{}{1, 2},
 			},
+
+			test{
+				"insert rows from a select query",
+				dbz.InsertInto("table").Columns("one", "two").FromSelect(
+					dbz.Select("*").From("table2"),
+				),
+				"INSERT INTO table (one, two) SELECT * FROM table2",
+				[]interface{}{},
+			},
 		}
 	})
 }

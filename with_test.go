@@ -45,6 +45,23 @@ func TestWith(t *testing.T) {
 				"WITH somethings AS (SELECT id FROM table WHERE something = ?), values AS (SELECT MAX(value) AS max FROM other_table WHERE something = ?) DELETE FROM ref_table WHERE something_id = somethings.id AND value < values.max",
 				[]interface{}{3, 3},
 			},
+
+			test{
+				"INSERT query that insert from a WITH-ed SELECT",
+				dbz.With(
+					dbz.Select("id").
+						From("table").
+						Where(Eq("something", 3)),
+					"somethings",
+				).Then(
+					dbz.InsertInto("ref_table").
+						FromSelect(
+							dbz.Select("*").From("somethings"),
+						),
+				),
+				"WITH somethings AS (SELECT id FROM table WHERE something = ?) INSERT INTO ref_table SELECT * FROM somethings",
+				[]interface{}{3},
+			},
 		}
 	})
 }
