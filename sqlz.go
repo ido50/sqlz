@@ -205,6 +205,25 @@ func JSONBOp(op string, left string, value interface{}) SimpleCondition {
 	}
 }
 
+// InCondition is a struct representing IN and NOT IN conditions
+type InCondition struct {
+	NotIn bool
+	Left  string
+	Right []interface{}
+}
+
+// In creates an IN condition for matching the value of a column
+// against an array of possible values
+func In(col string, values ...interface{}) InCondition {
+	return InCondition{false, col, values}
+}
+
+// NotIn creates a NOT IN condition for checking that the value
+// of a column is not one of the defined values
+func NotIn(col string, values ...interface{}) InCondition {
+	return InCondition{true, col, values}
+}
+
 // ArrayCondition represents an array comparison condition
 type ArrayCondition struct {
 	Left     interface{}
@@ -301,6 +320,27 @@ func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
 		bindings = append(bindings, array.Left)
 	}
 	asSQL += " " + array.Operator + " " + array.Type + "(" + array.Right + ")"
+
+	return asSQL, bindings
+}
+
+// Parse implements the WhereCondition interface, generating SQL from
+// the condition
+func (in InCondition) Parse() (asSQL string, bindings []interface{}) {
+	asSQL = in.Left
+	if in.NotIn {
+		asSQL += " NOT"
+	}
+	asSQL += " IN ("
+
+	var placeholders []string
+
+	for _, val := range in.Right {
+		placeholders = append(placeholders, "?")
+		bindings = append(bindings, val)
+	}
+
+	asSQL += strings.Join(placeholders, ", ") + ")"
 
 	return asSQL, bindings
 }

@@ -57,6 +57,27 @@ func TestSelect(t *testing.T) {
 				"SELECT * FROM table WHERE ? = ANY(array_col) AND ? > ALL(other_array_col) AND NOW() <> ANY(yet_another_col)",
 				[]interface{}{3, 1},
 			},
+
+			test{
+				"select with IN condition",
+				dbz.Select("*").From("table").Where(In("id", 1, 2, 3, 4)),
+				"SELECT * FROM table WHERE id IN (?, ?, ?, ?)",
+				[]interface{}{1, 2, 3, 4},
+			},
+
+			test{
+				"select with multiple IN conditions",
+				dbz.Select("*").From("table").Where(Or(In("one", 3, 4), NotIn("two", "a", "b"))),
+				"SELECT * FROM table WHERE one IN (?, ?) OR two NOT IN (?, ?)",
+				[]interface{}{3, 4, "a", "b"},
+			},
+
+			test{
+				"select with both IN and simple conditions",
+				dbz.Select("*").From("table").Where(In("one", 3, 4), Eq("id", "a")),
+				"SELECT * FROM table WHERE one IN (?, ?) AND id = ?",
+				[]interface{}{3, 4, "a"},
+			},
 		}
 	})
 }
