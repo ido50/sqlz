@@ -51,11 +51,7 @@ func (db *DB) Transactional(f func(tx *Tx) error) error {
 
 	err = f(&Tx{tx})
 	if err != nil {
-		rErr := tx.Rollback()
-		err = fmt.Errorf("transaction failed: %s", err)
-		if rErr != nil {
-			err = fmt.Errorf("%s (rollback failed: %s)", err, rErr)
-		}
+		tx.Rollback()
 		return err
 	}
 
