@@ -11,7 +11,8 @@ import (
 type DeleteStmt struct {
 	Table      string
 	Conditions []WhereCondition
-	execer     sqlx.Execer
+	Return     []string
+	execer     sqlx.Ext
 }
 
 // DeleteFrom creates a new DeleteStmt object for the
@@ -39,6 +40,15 @@ func (stmt *DeleteStmt) Where(conds ...WhereCondition) *DeleteStmt {
 	return stmt
 }
 
+// Returning sets a RETURNING clause to receive values back from the
+// database once executing the DELETE statement. Note that GetRow or
+// GetAll must be used to execute the query rather than Exec to get
+// back the values.
+func (stmt *DeleteStmt) Returning(cols ...string) *DeleteStmt {
+	stmt.Return = append(stmt.Return, cols...)
+	return stmt
+}
+
 // ToSQL generates the DELETE statement's SQL and returns a list of
 // bindings. It is used internally by Exec, but is exported if you
 // wish to use it directly.
@@ -49,6 +59,10 @@ func (stmt *DeleteStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		whereClause, whereBindings := parseConditions(stmt.Conditions)
 		bindings = append(bindings, whereBindings...)
 		clauses = append(clauses, "WHERE "+whereClause)
+	}
+
+	if len(stmt.Return) > 0 {
+		clauses = append(clauses, "RETURNING "+strings.Join(stmt.Return, ", "))
 	}
 
 	asSQL = strings.Join(clauses, " ")
@@ -69,4 +83,22 @@ func (stmt *DeleteStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 func (stmt *DeleteStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	return stmt.execer.Exec(asSQL, bindings...)
+}
+
+// GetRow executes a DELETE statement with a RETURNING clause
+// expected to return one row, and loads the result into
+// the provided variable (which may be a simple variable if
+// only one column is returned, or a struct if multiple columns
+// are returned)
+func (stmt *DeleteStmt) GetRow(into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
+}
+
+// GetAll executes a DELETE statement with a RETURNING clause
+// expected to return multiple rows, and loads the result into
+// the provided slice variable
+func (stmt *DeleteStmt) GetAll(into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
 }

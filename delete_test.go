@@ -18,6 +18,13 @@ func TestDelete(t *testing.T) {
 				"DELETE FROM table WHERE id = ? OR (name = ? AND integer > ?)",
 				[]interface{}{1, "some-name", 3},
 			},
+
+			test{
+				"delete with returning clause",
+				dbz.DeleteFrom("table").Where(Eq("id", 2)).Returning("name"),
+				"DELETE FROM table WHERE id = ? RETURNING name",
+				[]interface{}{2},
+			},
 		}
 	})
 }
