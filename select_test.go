@@ -78,6 +78,13 @@ func TestSelect(t *testing.T) {
 				"SELECT * FROM table WHERE one IN (?, ?) AND id = ?",
 				[]interface{}{3, 4, "a"},
 			},
+
+			test{
+				"select with both simple and SQL conditions",
+				dbz.Select("*").From("table").Where(Eq("one", 2), SQLCond("? LIKE some_col", "bla")),
+				"SELECT * FROM table WHERE one = ? AND ? LIKE some_col",
+				[]interface{}{2, "bla"},
+			},
 		}
 	})
 }

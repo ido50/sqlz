@@ -96,6 +96,14 @@ type SubqueryCondition struct {
 	Operator string
 }
 
+// SQLCondition represents a condition written directly in
+// SQL, allows using complex SQL conditions not yet supported
+// by sqlz
+type SQLCondition struct {
+	Condition string
+	Binds     []interface{}
+}
+
 // IndirectValue represents a reference to a database name
 // (e.g. column, function) that should be used as-is in a
 // query rather than replaced with a placeholder.
@@ -201,6 +209,13 @@ func JSONBOp(op string, left string, value interface{}) SimpleCondition {
 	}
 }
 
+// SQLCond creates an SQL condition, allowing to use complex SQL conditions
+// that are not yet supported by sqlz. Question marks must be used for
+// placeholders in the condition regardless of the database driver.
+func SQLCond(condition string, binds ...interface{}) SQLCondition {
+	return SQLCondition{condition, binds}
+}
+
 // InCondition is a struct representing IN and NOT IN conditions
 type InCondition struct {
 	NotIn bool
@@ -304,6 +319,12 @@ func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 	}
 
 	return asSQL, bindings
+}
+
+// Parse implements the WhereCondition interface, generating SQL from
+// the condition
+func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
+	return cond.Condition, cond.Binds
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
