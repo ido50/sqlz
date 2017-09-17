@@ -41,6 +41,21 @@ func TestInsert(t *testing.T) {
 				"INSERT INTO table (one, two) SELECT * FROM table2",
 				[]interface{}{},
 			},
+
+			test{
+				"insert with an on conflict do update",
+				dbz.InsertInto("table").Columns("name").Values("My Name").
+					OnConflict(
+						OnConflict("name", "something_else").
+							DoUpdate().
+							Set("update_date", 55151515).
+							SetMap(map[string]interface{}{
+								"name":    "My Name Again",
+								"address": "Some Address",
+							})),
+				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name, something_else) DO UPDATE SET update_date = ?, name = ?, address = ?",
+				[]interface{}{"My Name", 55151515, "My Name Again", "Some Address"},
+			},
 		}
 	})
 }
