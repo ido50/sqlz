@@ -107,6 +107,10 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		for _, val := range stmt.InsVals {
 			if indirect, isIndirect := val.(IndirectValue); isIndirect {
 				placeholders = append(placeholders, indirect.Reference)
+			} else if builder, isBuilder := val.(JSONBBuilder); isBuilder {
+				bSQL, bBindings := builder.Parse()
+				placeholders = append(placeholders, bSQL)
+				bindings = append(bindings, bBindings...)
 			} else {
 				placeholders = append(placeholders, "?")
 				bindings = append(bindings, val)
