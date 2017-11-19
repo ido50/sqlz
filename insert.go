@@ -9,13 +9,14 @@ import (
 
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
-	InsCols    []string
-	InsVals    []interface{}
-	SelectStmt *SelectStmt
-	Table      string
-	Return     []string
-	Conflicts  []*ConflictClause
-	execer     sqlx.Ext
+	InsCols         []string
+	InsVals         []interface{}
+	SelectStmt      *SelectStmt
+	Table           string
+	Return          []string
+	Conflicts       []*ConflictClause
+	execer          sqlx.Ext
+	ignoredIfExists bool
 }
 
 // InsertInto creates a new InsertStmt object for the
@@ -82,6 +83,11 @@ func (stmt *InsertStmt) OnConflictDoNothing() *InsertStmt {
 	return stmt.OnConflict(OnConflict().DoNothing())
 }
 
+func (stmt *InsertStmt) OrIgnore() *InsertStmt {
+	stmt.ignoredIfExists = true
+	return stmt
+}
+
 // OnConflict adds an ON CONFLICT clause to the statement
 func (stmt *InsertStmt) OnConflict(clause *ConflictClause) *InsertStmt {
 	stmt.Conflicts = append(stmt.Conflicts, clause)
@@ -92,7 +98,11 @@ func (stmt *InsertStmt) OnConflict(clause *ConflictClause) *InsertStmt {
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
 func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
-	var clauses = []string{"INSERT INTO " + stmt.Table}
+	var clauses = []string{"INSERT", "INTO", stmt.Table}
+
+	if stmt.ignoredIfExists {
+		clauses[0] += " OR IGNORE"
+	}
 
 	if len(stmt.InsCols) > 0 {
 		clauses = append(clauses, "("+strings.Join(stmt.InsCols, ", ")+")")

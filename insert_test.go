@@ -56,6 +56,12 @@ func TestInsert(t *testing.T) {
 				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name, something_else) DO UPDATE SET update_date = ?, name = ?, address = ?",
 				[]interface{}{"My Name", 55151515, "My Name Again", "Some Address"},
 			},
+			test{
+				"insert or ignore",
+				dbz.InsertInto("table").OrIgnore().Columns("id", "name", "date").Values(1, "My Name", 96969696),
+				"INSERT OR IGNORE INTO table (id, name, date) VALUES (?, ?, ?)",
+				[]interface{}{1, "My Name", 96969696},
+			},
 		}
 	})
 }
