@@ -31,6 +31,7 @@ const (
 // SelectStmt represents a SELECT statement
 type SelectStmt struct {
 	IsDistinct      bool
+	DistinctColumns	[]string
 	Columns         []string
 	Table           string
 	Joins           []JoinClause
@@ -107,7 +108,8 @@ func (tx *Tx) Select(cols ...string) *SelectStmt {
 
 // Distinct marks the statements as a SELECT DISTINCT
 // statement
-func (stmt *SelectStmt) Distinct() *SelectStmt {
+func (stmt *SelectStmt) Distinct(cols ...string) *SelectStmt {
+	stmt.DistinctColumns = append([]string{}, cols...)
 	stmt.IsDistinct = true
 	return stmt
 }
@@ -235,6 +237,9 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 
 	if stmt.IsDistinct {
 		clauses = append(clauses, "DISTINCT")
+		if len(stmt.DistinctColumns) > 0 {
+			clauses = append(clauses, "ON (" + strings.Join(stmt.DistinctColumns, ", ") + ")")
+		}
 	}
 
 	if len(stmt.Columns) == 0 {
