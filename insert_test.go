@@ -62,6 +62,12 @@ func TestInsert(t *testing.T) {
 				"INSERT OR IGNORE INTO table (id, name, date) VALUES (?, ?, ?)",
 				[]interface{}{1, "My Name", 96969696},
 			},
+			test{
+				"insert or replace",
+				dbz.InsertInto("table").OrReplace().Columns("id", "name", "date").Values(1, "My Name", 96969696),
+				"INSERT OR REPLACE INTO table (id, name, date) VALUES (?, ?, ?)",
+				[]interface{}{1, "My Name", 96969696},
+			},
 		}
 	})
 }

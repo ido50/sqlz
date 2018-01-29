@@ -2,6 +2,7 @@ package sqlz
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -9,14 +10,14 @@ import (
 
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
-	InsCols         []string
-	InsVals         []interface{}
-	SelectStmt      *SelectStmt
-	Table           string
-	Return          []string
-	Conflicts       []*ConflictClause
-	execer          sqlx.Ext
-	ignoredIfExists bool
+	InsCols        []string
+	InsVals        []interface{}
+	SelectStmt     *SelectStmt
+	Table          string
+	Return         []string
+	Conflicts      []*ConflictClause
+	execer         sqlx.Ext
+	sqliteConflict string
 }
 
 // InsertInto creates a new InsertStmt object for the
@@ -83,8 +84,33 @@ func (stmt *InsertStmt) OnConflictDoNothing() *InsertStmt {
 	return stmt.OnConflict(OnConflict().DoNothing())
 }
 
+// OrIgnore enables the "OR IGNORE" conflict resolution for SQLIte inserts
 func (stmt *InsertStmt) OrIgnore() *InsertStmt {
-	stmt.ignoredIfExists = true
+	stmt.sqliteConflict = "IGNORE"
+	return stmt
+}
+
+// OrReplace enables the "OR REPLACE" conflict resolution for SQLIte inserts
+func (stmt *InsertStmt) OrReplace() *InsertStmt {
+	stmt.sqliteConflict = "REPLACE"
+	return stmt
+}
+
+// OrAbort enables the "OR ABORT" conflict resolution for SQLIte inserts
+func (stmt *InsertStmt) OrAbort() *InsertStmt {
+	stmt.sqliteConflict = "ABORT"
+	return stmt
+}
+
+// OrRollback enables the "OR ROLLBACK" conflict resolution for SQLIte inserts
+func (stmt *InsertStmt) OrRollback() *InsertStmt {
+	stmt.sqliteConflict = "ROLLBACK"
+	return stmt
+}
+
+// OrFail enables the "OR FAIL" conflict resolution for SQLIte inserts
+func (stmt *InsertStmt) OrFail() *InsertStmt {
+	stmt.sqliteConflict = "FAIL"
 	return stmt
 }
 
@@ -100,8 +126,8 @@ func (stmt *InsertStmt) OnConflict(clause *ConflictClause) *InsertStmt {
 func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"INSERT", "INTO", stmt.Table}
 
-	if stmt.ignoredIfExists {
-		clauses[0] += " OR IGNORE"
+	if stmt.sqliteConflict != "" {
+		clauses[0] = fmt.Sprintf("INSERT OR %s", stmt.sqliteConflict)
 	}
 
 	if len(stmt.InsCols) > 0 {
