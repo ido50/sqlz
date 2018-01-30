@@ -9,10 +9,11 @@ import (
 
 // DeleteStmt represents a DELETE statement
 type DeleteStmt struct {
-	Table      string
-	Conditions []WhereCondition
-	Return     []string
-	execer     sqlx.Ext
+	Table       string
+	Conditions  []WhereCondition
+	UsingTables []string
+	Return      []string
+	execer      sqlx.Ext
 }
 
 // DeleteFrom creates a new DeleteStmt object for the
@@ -31,6 +32,12 @@ func (tx *Tx) DeleteFrom(table string) *DeleteStmt {
 		Table:  table,
 		execer: tx.Tx,
 	}
+}
+
+// Using adds a USING clause for joining in a delete statement
+func (stmt *DeleteStmt) Using(tables ...string) *DeleteStmt {
+	stmt.UsingTables = append(stmt.UsingTables, tables...)
+	return stmt
 }
 
 // Where creates one or more WHERE conditions for the DELETE statement.
@@ -54,6 +61,10 @@ func (stmt *DeleteStmt) Returning(cols ...string) *DeleteStmt {
 // wish to use it directly.
 func (stmt *DeleteStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"DELETE FROM " + stmt.Table}
+
+	if len(stmt.UsingTables) > 0 {
+		clauses = append(clauses, "USING "+strings.Join(stmt.UsingTables, ", "))
+	}
 
 	if len(stmt.Conditions) > 0 {
 		whereClause, whereBindings := parseConditions(stmt.Conditions)
