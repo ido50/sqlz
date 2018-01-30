@@ -31,7 +31,7 @@ const (
 // SelectStmt represents a SELECT statement
 type SelectStmt struct {
 	IsDistinct      bool
-	DistinctColumns	[]string
+	DistinctColumns []string
 	Columns         []string
 	Table           string
 	Joins           []JoinClause
@@ -39,6 +39,7 @@ type SelectStmt struct {
 	Ordering        []OrderColumn
 	Grouping        []string
 	GroupConditions []WhereCondition
+	Locks           []*LockClause
 	LimitTo         int64
 	OffsetFrom      int64
 	OffsetRows      int64
@@ -53,6 +54,48 @@ type JoinClause struct {
 	ResultSet  *SelectStmt
 	Conditions []WhereCondition
 }
+
+// LockClause represents a row or table level locking for a SELECT statement
+type LockClause struct {
+	Strength LockStrength
+	Tables   []string
+	Wait     LockWait
+}
+
+func (lock *LockClause) NoWait() *LockClause {
+	lock.Wait = LockNoWait
+	return lock
+}
+
+func (lock *LockClause) SkipLocked() *LockClause {
+	lock.Wait = LockSkipLocked
+	return lock
+}
+
+func (lock *LockClause) OfTables(tables ...string) *LockClause {
+	lock.Tables = append(lock.Tables, tables...)
+	return lock
+}
+
+// LockStrength represents the strength of a LockClause
+type LockStrength int8
+
+const (
+	LockForUpdate LockStrength = iota
+	LockForNoKeyUpdate
+	LockForShare
+	LockForKeyShare
+)
+
+// LockWait represents the behavior of the database when a lock cannot
+// be acquired
+type LockWait int8
+
+const (
+	LockDefault LockWait = iota
+	LockNoWait
+	LockSkipLocked
+)
 
 // OrderColumn represents a column in an ORDER BY
 // clause (with direction)
@@ -229,6 +272,31 @@ func (stmt *SelectStmt) Offset(start int64, rows ...int64) *SelectStmt {
 	return stmt
 }
 
+func (stmt *SelectStmt) Lock(lock *LockClause) *SelectStmt {
+	stmt.Locks = append(stmt.Locks, lock)
+	return stmt
+}
+
+// ForUpdate adds a "FOR UPDATE" lock clause on the statement
+func ForUpdate() *LockClause {
+	return &LockClause{Strength: LockForUpdate}
+}
+
+// ForNoKeyUpdate adds a "FOR NO KEY UPDATE" lock clause on the statement
+func ForNoKeyUpdate() *LockClause {
+	return &LockClause{Strength: LockForNoKeyUpdate}
+}
+
+// ForShare adds a "FOR SHARE" lock clause on the statement
+func ForShare() *LockClause {
+	return &LockClause{Strength: LockForShare}
+}
+
+// ForKeyShare adds a "FOR KEY SHARE" lock clause on the statement
+func ForKeyShare() *LockClause {
+	return &LockClause{Strength: LockForKeyShare}
+}
+
 // ToSQL generates the SELECT statement's SQL and returns a list of
 // bindings. It is used internally by GetRow and GetAll, but is
 // exported if you wish to use it directly.
@@ -238,7 +306,7 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	if stmt.IsDistinct {
 		clauses = append(clauses, "DISTINCT")
 		if len(stmt.DistinctColumns) > 0 {
-			clauses = append(clauses, "ON (" + strings.Join(stmt.DistinctColumns, ", ") + ")")
+			clauses = append(clauses, "ON ("+strings.Join(stmt.DistinctColumns, ", ")+")")
 		}
 	}
 
@@ -301,6 +369,38 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 			offset += fmt.Sprintf(" %d", stmt.OffsetRows)
 		}
 		clauses = append(clauses, "OFFSET "+offset)
+	}
+
+	for _, lock := range stmt.Locks {
+		var lockClause []string
+
+		var lockStrength string
+		switch lock.Strength {
+		case LockForUpdate:
+			lockStrength = "FOR UPDATE"
+		case LockForNoKeyUpdate:
+			lockStrength = "FOR NO KEY UPDATE"
+		case LockForShare:
+			lockStrength = "FOR SHARE"
+		case LockForKeyShare:
+			lockStrength = "FOR KEY SHARE"
+		default:
+			continue
+		}
+		lockClause = append(lockClause, lockStrength)
+
+		if len(lock.Tables) > 0 {
+			lockClause = append(lockClause, "OF "+strings.Join(lock.Tables, ", "))
+		}
+
+		switch lock.Wait {
+		case LockNoWait:
+			lockClause = append(lockClause, "NOWAIT")
+		case LockSkipLocked:
+			lockClause = append(lockClause, "SKIP LOCKED")
+		}
+
+		clauses = append(clauses, strings.Join(lockClause, " "))
 	}
 
 	asSQL = strings.Join(clauses, " ")

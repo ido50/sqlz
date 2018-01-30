@@ -85,6 +85,20 @@ func TestSelect(t *testing.T) {
 				"SELECT * FROM table WHERE one = ? AND ? LIKE some_col",
 				[]interface{}{2, "bla"},
 			},
+
+			test{
+				"select for update",
+				dbz.Select("*").From("table").Where(Eq("id", 1)).Lock(ForUpdate()),
+				"SELECT * FROM table WHERE id = ? FOR UPDATE",
+				[]interface{}{1},
+			},
+
+			test{
+				"select for no key update of table without waiting",
+				dbz.Select("*").From("table").Lock(ForNoKeyUpdate().OfTables("table").NoWait()),
+				"SELECT * FROM table FOR NO KEY UPDATE OF table NOWAIT",
+				[]interface{}{},
+			},
 		}
 	})
 }
