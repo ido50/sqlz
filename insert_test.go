@@ -56,6 +56,21 @@ func TestInsert(t *testing.T) {
 				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name, something_else) DO UPDATE SET update_date = ?, name = ?, address = ?",
 				[]interface{}{"My Name", 55151515, "My Name Again", "Some Address"},
 			},
+
+			test{
+				"insert with an on conflict do update conditional set",
+				dbz.InsertInto("table").Columns("name").Values("My Name").
+					OnConflict(
+						OnConflict("name").
+							DoUpdate().
+							Set("update_date", 55151515).
+							SetIf("true", 1, true).
+							SetIf("false", 0, false),
+					),
+				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name) DO UPDATE SET update_date = ?, true = ?",
+				[]interface{}{"My Name", 55151515, 1},
+			},
+
 			test{
 				"insert or ignore",
 				dbz.InsertInto("table").OrIgnore().Columns("id", "name", "date").Values(1, "My Name", 96969696),

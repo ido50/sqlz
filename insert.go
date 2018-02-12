@@ -243,14 +243,7 @@ func (conflict *ConflictClause) DoUpdate() *ConflictClause {
 
 // Set adds a column to update as part of the conflict resolution
 func (conflict *ConflictClause) Set(col string, val interface{}) *ConflictClause {
-	if conflict.Action != DoUpdate {
-		return conflict
-	}
-
-	conflict.SetCols = append(conflict.SetCols, col)
-	conflict.SetVals = append(conflict.SetVals, val)
-
-	return conflict
+	return conflict.SetIf(col, val, true)
 }
 
 // SetMap adds a mapping between columns to values to update as part of the
@@ -261,6 +254,23 @@ func (conflict *ConflictClause) SetMap(vals map[string]interface{}) *ConflictCla
 	}
 
 	for col, val := range vals {
+		conflict.SetCols = append(conflict.SetCols, col)
+		conflict.SetVals = append(conflict.SetVals, val)
+	}
+
+	return conflict
+}
+
+// SetIf is the same as Set, but also accepts a boolean value and only does
+// anything if that value is true. This is a convenience method so that
+// conditional updates can be made without having to save the ConflictClause
+// into a variable and using if statements
+func (conflict *ConflictClause) SetIf(col string, val interface{}, b bool) *ConflictClause {
+	if conflict.Action != DoUpdate {
+		return conflict
+	}
+
+	if b {
 		conflict.SetCols = append(conflict.SetCols, col)
 		conflict.SetVals = append(conflict.SetVals, val)
 	}

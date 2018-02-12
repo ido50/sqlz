@@ -40,14 +40,24 @@ func (tx *Tx) Update(table string) *UpdateStmt {
 // can be chained together to modify multiple columns. Set can also be chained
 // with calls to SetMap
 func (stmt *UpdateStmt) Set(col string, value interface{}) *UpdateStmt {
-	stmt.Updates[col] = value
-	return stmt
+	return stmt.SetIf(col, value, true)
 }
 
 // SetMap receives a map of columns and values. Multiple calls to both Set and
 // SetMap can be chained to modify multiple columns.
 func (stmt *UpdateStmt) SetMap(updates map[string]interface{}) *UpdateStmt {
 	for col, value := range updates {
+		stmt.Updates[col] = value
+	}
+	return stmt
+}
+
+// SetIf is the same as Set, but also accepts a boolean value and only does
+// anything if that value is true. This is a convenience method so that
+// conditional updates can be made without having to save the UpdateStmt into
+// a variable and using if statements
+func (stmt *UpdateStmt) SetIf(col string, value interface{}, b bool) *UpdateStmt {
+	if b {
 		stmt.Updates[col] = value
 	}
 	return stmt

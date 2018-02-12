@@ -39,6 +39,20 @@ func TestUpdate(t *testing.T) {
 				"UPDATE table SET something = ?, things = array_append(things, ?)",
 				[]interface{}{3, "asdf"},
 			},
+
+			test{
+				"update with conditional set (true)",
+				dbz.Update("table").Set("something", 3).SetIf("other", 2, 3 > 1),
+				"UPDATE table SET something = ?, other = ?",
+				[]interface{}{3, 2},
+			},
+
+			test{
+				"update with conditional set (false)",
+				dbz.Update("table").Set("something", 3).SetIf("other", 2, 3 == 1),
+				"UPDATE table SET something = ?",
+				[]interface{}{3},
+			},
 		}
 	})
 }
