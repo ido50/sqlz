@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -16,7 +17,7 @@ type InsertStmt struct {
 	Table          string
 	Return         []string
 	Conflicts      []*ConflictClause
-	execer         sqlx.Ext
+	execer         Ext
 	sqliteConflict string
 }
 
@@ -186,6 +187,13 @@ func (stmt *InsertStmt) Exec() (res sql.Result, err error) {
 	return stmt.execer.Exec(asSQL, bindings...)
 }
 
+// ExecContext executes the INSERT statement, returning the standard
+// sql.Result struct and an error if the query failed.
+func (stmt *InsertStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+}
+
 // GetRow executes an INSERT statement with a RETURNING clause
 // expected to return one row, and loads the result into
 // the provided variable (which may be a simple variable if
@@ -196,12 +204,30 @@ func (stmt *InsertStmt) GetRow(into interface{}) error {
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
+// GetRowContext executes an INSERT statement with a RETURNING clause
+// expected to return one row, and loads the result into
+// the provided variable (which may be a simple variable if
+// only one column is returned, or a struct if multiple columns
+// are returned)
+func (stmt *InsertStmt) GetRowContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+}
+
 // GetAll executes an INSERT statement with a RETURNING clause
 // expected to return multiple rows, and loads the result into
 // the provided slice variable
 func (stmt *InsertStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+}
+
+// GetAllContext executes an INSERT statement with a RETURNING clause
+// expected to return multiple rows, and loads the result into
+// the provided slice variable
+func (stmt *InsertStmt) GetAllContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 }
 
 // ConflictAction represents an action to perform on an INSERT conflict

@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -24,7 +25,7 @@ type WithStmt struct {
 	// auxiliary statements can be referenced
 	MainStmt SQLStmt
 
-	execer sqlx.Ext
+	execer Ext
 }
 
 // With creates a new WithStmt object including
@@ -93,6 +94,13 @@ func (stmt *WithStmt) Exec() (res sql.Result, err error) {
 	return stmt.execer.Exec(asSQL, bindings...)
 }
 
+// ExecContext executes the WITH statement, returning the standard
+// sql.Result struct and an error if the query failed.
+func (stmt *WithStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+}
+
 // GetRow executes a WITH statement whose main statement has
 // a RETURNING clause expected to return one row, and loads
 // the result into the provided variable (which may be a
@@ -103,10 +111,28 @@ func (stmt *WithStmt) GetRow(into interface{}) error {
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
+// GetRowContext executes a WITH statement whose main statement has
+// a RETURNING clause expected to return one row, and loads
+// the result into the provided variable (which may be a
+// simple variable if only one column is returned, or a
+// struct if multiple columns are returned)
+func (stmt *WithStmt) GetRowContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+}
+
 // GetAll executes a WITH statement whose main statement has
 // a RETURNING clause expected to return multiple rows, and
 // loads the result into the provided slice variable
 func (stmt *WithStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+}
+
+// GetAllContext executes a WITH statement whose main statement has
+// a RETURNING clause expected to return multiple rows, and
+// loads the result into the provided slice variable
+func (stmt *WithStmt) GetAllContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 }

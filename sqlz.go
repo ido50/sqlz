@@ -3,12 +3,28 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
+
+// Ext is a union interface which can bind, query, and exec,
+// with or without contexts, used by NamedQuery and NamedExec
+type Ext interface {
+	sqlx.Queryer
+	sqlx.QueryerContext
+	sqlx.Execer
+	sqlx.ExecerContext
+}
+
+// Queryer is an interface used by Get and Select, with or without context
+type Queryer interface {
+	sqlx.Queryer
+	sqlx.QueryerContext
+}
 
 // DB is a wrapper around sqlx.DB (which is a wrapper around sql.DB)
 type DB struct {
@@ -45,6 +61,30 @@ func Newx(db *sqlx.DB) *DB {
 // back. Otherwise, the transaction is committed.
 func (db *DB) Transactional(f func(tx *Tx) error) error {
 	tx, err := db.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed starting transaction: %s", err)
+	}
+
+	err = f(&Tx{tx})
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed committing transaction: %s", err)
+	}
+
+	return nil
+}
+
+// TransactionalContext runs the provided function inside a transaction. The
+// function must receive an sqlz Tx object, and return an error. If the
+// function returns an error, the transaction is automatically rolled
+// back. Otherwise, the transaction is committed.
+func (db *DB) TransactionalContext(ctx context.Context, opts *sql.TxOptions, f func(tx *Tx) error) error {
+	tx, err := db.BeginTxx(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed starting transaction: %s", err)
 	}
