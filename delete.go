@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -13,7 +14,7 @@ type DeleteStmt struct {
 	Conditions  []WhereCondition
 	UsingTables []string
 	Return      []string
-	execer      sqlx.Ext
+	execer      Ext
 }
 
 // DeleteFrom creates a new DeleteStmt object for the
@@ -96,6 +97,13 @@ func (stmt *DeleteStmt) Exec() (res sql.Result, err error) {
 	return stmt.execer.Exec(asSQL, bindings...)
 }
 
+// ExecContext executes the DELETE statement, returning the standard
+// sql.Result struct and an error if the query failed.
+func (stmt *DeleteStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+}
+
 // GetRow executes a DELETE statement with a RETURNING clause
 // expected to return one row, and loads the result into
 // the provided variable (which may be a simple variable if
@@ -106,10 +114,28 @@ func (stmt *DeleteStmt) GetRow(into interface{}) error {
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
+// GetRowContext executes a DELETE statement with a RETURNING clause
+// expected to return one row, and loads the result into
+// the provided variable (which may be a simple variable if
+// only one column is returned, or a struct if multiple columns
+// are returned)
+func (stmt *DeleteStmt) GetRowContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+}
+
 // GetAll executes a DELETE statement with a RETURNING clause
 // expected to return multiple rows, and loads the result into
 // the provided slice variable
 func (stmt *DeleteStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+}
+
+// GetAllContext executes a DELETE statement with a RETURNING clause
+// expected to return multiple rows, and loads the result into
+// the provided slice variable
+func (stmt *DeleteStmt) GetAllContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 }

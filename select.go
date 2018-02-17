@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -43,7 +44,7 @@ type SelectStmt struct {
 	LimitTo         int64
 	OffsetFrom      int64
 	OffsetRows      int64
-	queryer         sqlx.Queryer
+	queryer         Queryer
 }
 
 // JoinClause represents a JOIN clause in a
@@ -425,11 +426,27 @@ func (stmt *SelectStmt) GetRow(into interface{}) error {
 	return sqlx.Get(stmt.queryer, into, asSQL, bindings...)
 }
 
+// GetRowContext executes the SELECT statement and loads the first
+// result into the provided variable (which may be a simple
+// variable if only one column was selected, or a struct if
+// multiple columns were selected).
+func (stmt *SelectStmt) GetRowContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.GetContext(ctx, stmt.queryer, into, asSQL, bindings...)
+}
+
 // GetAll executes the SELECT statement and loads all the
 // results into the provided slice variable.
 func (stmt *SelectStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.queryer, into, asSQL, bindings...)
+}
+
+// GetAllContext executes the SELECT statement and loads all the
+// results into the provided slice variable.
+func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.SelectContext(ctx, stmt.queryer, into, asSQL, bindings...)
 }
 
 // GetCount executes the SELECT statement disregarding limits,
@@ -446,5 +463,22 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 	countStmt.Ordering = []OrderColumn{}
 
 	err = countStmt.GetRow(&count)
+	return count, err
+}
+
+// GetCountContext executes the SELECT statement disregarding limits,
+// offsets, selected columns and ordering; and returns the
+// total number of matching results. This is useful when
+// paginating results.
+func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err error) {
+	var countStmt SelectStmt
+	countStmt = *stmt
+	countStmt.Columns = []string{"COUNT(*)"}
+	countStmt.LimitTo = 0
+	countStmt.OffsetFrom = 0
+	countStmt.OffsetRows = 0
+	countStmt.Ordering = []OrderColumn{}
+
+	err = countStmt.GetRowContext(ctx, &count)
 	return count, err
 }

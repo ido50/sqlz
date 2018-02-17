@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -13,7 +14,7 @@ type UpdateStmt struct {
 	Updates    map[string]interface{}
 	Conditions []WhereCondition
 	Return     []string
-	execer     sqlx.Ext
+	execer     Ext
 }
 
 // Update creates a new UpdateStmt object for
@@ -139,6 +140,13 @@ func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 	return stmt.execer.Exec(asSQL, bindings...)
 }
 
+// ExecContext executes the UPDATE statement, returning the standard
+// sql.Result struct and an error if the query failed.
+func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+}
+
 // GetRow executes an UPDATE statement with a RETURNING clause
 // expected to return one row, and loads the result into
 // the provided variable (which may be a simple variable if
@@ -149,12 +157,30 @@ func (stmt *UpdateStmt) GetRow(into interface{}) error {
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
+// GetRowContext executes an UPDATE statement with a RETURNING clause
+// expected to return one row, and loads the result into
+// the provided variable (which may be a simple variable if
+// only one column is returned, or a struct if multiple columns
+// are returned)
+func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+}
+
 // GetAll executes an UPDATE statement with a RETURNING clause
 // expected to return multiple rows, and loads the result into
 // the provided slice variable
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+}
+
+// GetAllContext executes an UPDATE statement with a RETURNING clause
+// expected to return multiple rows, and loads the result into
+// the provided slice variable
+func (stmt *UpdateStmt) GetAllContext(ctx context.Context, into interface{}) error {
+	asSQL, bindings := stmt.ToSQL(true)
+	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 }
 
 // UpdateFunction represents a function call in the context of
