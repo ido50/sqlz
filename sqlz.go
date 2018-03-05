@@ -43,6 +43,15 @@ type SQLStmt interface {
 	ToSQL(bool) (string, []interface{})
 }
 
+type SQLSimpleClause interface{
+   ToSQL()string
+}
+
+// ToSQL generates SQL for an IndirectValue
+func (i IndirectValue) ToSQL() string{
+	return i.Reference
+}
+
 // New creates a new DB instance from an underlying sql.DB object.
 // It requires the name of the SQL driver in order to use the correct
 // placeholders when generating SQL
