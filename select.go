@@ -37,7 +37,7 @@ type SelectStmt struct {
 	Table           string
 	Joins           []JoinClause
 	Conditions      []WhereCondition
-	Ordering        []OrderColumn
+	Ordering        []SQLSimpleClause
 	Grouping        []string
 	GroupConditions []WhereCondition
 	Locks           []*LockClause
@@ -236,7 +236,7 @@ func (stmt *SelectStmt) Where(conditions ...WhereCondition) *SelectStmt {
 
 // OrderBy sets an ORDER BY clause for the query. Pass OrderColumn objects
 // using the Asc and Desc functions.
-func (stmt *SelectStmt) OrderBy(cols ...OrderColumn) *SelectStmt {
+func (stmt *SelectStmt) OrderBy(cols ...SQLSimpleClause) *SelectStmt  {
 	stmt.Ordering = append(stmt.Ordering, cols...)
 	return stmt
 }
@@ -460,7 +460,7 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
 	countStmt.OffsetRows = 0
-	countStmt.Ordering = []OrderColumn{}
+	countStmt.Ordering = []SQLSimpleClause{}
 
 	err = countStmt.GetRow(&count)
 	return count, err
@@ -477,7 +477,7 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
 	countStmt.OffsetRows = 0
-	countStmt.Ordering = []OrderColumn{}
+	countStmt.Ordering = []SQLSimpleClause{}
 
 	err = countStmt.GetRowContext(ctx, &count)
 	return count, err
