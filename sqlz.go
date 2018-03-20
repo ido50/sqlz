@@ -286,70 +286,70 @@ func NotIn(col string, values ...interface{}) InCondition {
 
 // ArrayCondition represents an array comparison condition
 type ArrayCondition struct {
-	Left     interface{}
+	Left     string
 	Operator string
 	Type     string
-	Right    string
+	Right    interface{}
 }
 
 // EqAny creates an "= ANY" condition on an array column
 func EqAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "=", "ANY", col}
+	return ArrayCondition{col, "=", "ANY", value}
 }
 
 // NeAny creates an "<> ANY" condition on an array column
 func NeAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<>", "ANY", col}
+	return ArrayCondition{col, "<>", "ANY", value}
 }
 
 // LtAny creates an "< ANY" condition on an array column
 func LtAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<", "ANY", col}
+	return ArrayCondition{col, "<", "ANY", value}
 }
 
 // LteAny creates an "<= ANY" condition on an array column
 func LteAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<=", "ANY", col}
+	return ArrayCondition{col, "<=", "ANY", value}
 }
 
 // GtAny creates an "> ANY" condition on an array column
 func GtAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">", "ANY", col}
+	return ArrayCondition{col, ">", "ANY", value}
 }
 
 // GteAny creates an ">= ANY" condition on an array column
 func GteAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">=", "ANY", col}
+	return ArrayCondition{col, ">=", "ANY", value}
 }
 
 // EqAll creates an "= ALL" condition on an array column
 func EqAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "=", "ALL", col}
+	return ArrayCondition{col, "=", "ALL", value}
 }
 
 // NeAll creates an "<> ALL" condition on an array column
 func NeAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<>", "ALL", col}
+	return ArrayCondition{col, "<>", "ALL", value}
 }
 
 // LtAll creates an "< ALL" condition on an array column
 func LtAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<", "ALL", col}
+	return ArrayCondition{col, "<", "ALL", value}
 }
 
 // LteAll creates an "<= ALL" condition on an array column
 func LteAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<=", "ALL", col}
+	return ArrayCondition{col, "<=", "ALL", value}
 }
 
 // GtAll creates an "> ALL" condition on an array column
 func GtAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">", "ALL", col}
+	return ArrayCondition{col, ">", "ALL", value}
 }
 
 // GteAll creates an ">= ALL" condition on an array column
 func GteAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">=", "ALL", col}
+	return ArrayCondition{col, ">=", "ALL", value}
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
@@ -379,14 +379,13 @@ func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
-	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
+	if indirect, isIndirect := array.Right.(IndirectValue); isIndirect {
 		asSQL = indirect.Reference
 	} else {
 		asSQL = "?"
-		bindings = append(bindings, array.Left)
+		bindings = append(bindings, array.Right)
 	}
-	asSQL += " " + array.Operator + " " + array.Type + "(" + array.Right + ")"
-
+	asSQL = array.Left + " " + array.Operator + " " + array.Type + " (" + asSQL + ")"
 	return asSQL, bindings
 }
 
