@@ -144,6 +144,7 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		for _, val := range stmt.InsVals {
 			if indirect, isIndirect := val.(IndirectValue); isIndirect {
 				placeholders = append(placeholders, indirect.Reference)
+				bindings = append(bindings, indirect.Bindings...)
 			} else if builder, isBuilder := val.(JSONBBuilder); isBuilder {
 				bSQL, bBindings := builder.Parse()
 				placeholders = append(placeholders, bSQL)
@@ -325,6 +326,7 @@ func (conflict *ConflictClause) ToSQL() (asSQL string, bindings []interface{}) {
 				for _, arg := range fn.Arguments {
 					if indirect, isIndirect := arg.(IndirectValue); isIndirect {
 						args = append(args, indirect.Reference)
+						bindings = append(bindings, indirect.Bindings...)
 					} else {
 						args = append(args, "?")
 						bindings = append(bindings, arg)
@@ -333,6 +335,7 @@ func (conflict *ConflictClause) ToSQL() (asSQL string, bindings []interface{}) {
 				updates = append(updates, col+" = "+fn.Name+"("+strings.Join(args, ", ")+")")
 			} else if indirect, isIndirect := val.(IndirectValue); isIndirect {
 				updates = append(updates, col+" = "+indirect.Reference)
+				bindings = append(bindings, indirect.Bindings...)
 			} else {
 				updates = append(updates, col+" = ?")
 				bindings = append(bindings, val)

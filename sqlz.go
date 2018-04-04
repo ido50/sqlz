@@ -43,15 +43,6 @@ type SQLStmt interface {
 	ToSQL(bool) (string, []interface{})
 }
 
-type SQLSimpleClause interface{
-   ToSQL()string
-}
-
-// ToSQL generates SQL for an IndirectValue
-func (i IndirectValue) ToSQL() string{
-	return i.Reference
-}
-
 // New creates a new DB instance from an underlying sql.DB object.
 // It requires the name of the SQL driver in order to use the correct
 // placeholders when generating SQL
@@ -158,6 +149,7 @@ type SQLCondition struct {
 // query rather than replaced with a placeholder.
 type IndirectValue struct {
 	Reference string
+	Bindings  []interface{}
 }
 
 // Indirect receives a string and injects it into a query
@@ -166,8 +158,12 @@ type IndirectValue struct {
 // others') existing values, using database functions, etc.
 // Never use this with user-supplied input, as this may
 // open the door for SQL injections!
-func Indirect(value string) IndirectValue {
-	return IndirectValue{value}
+func Indirect(value string, bindings ...interface{}) IndirectValue {
+	return IndirectValue{value, bindings}
+}
+
+func (i IndirectValue) ToSQL(_ bool) (string, []interface{}) {
+	return i.Reference, i.Bindings
 }
 
 // And joins multiple where conditions as an AndOrCondition
@@ -361,6 +357,7 @@ func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 		placeholder := "?"
 		if indirect, isIndirect := simple.Right.(IndirectValue); isIndirect {
 			placeholder = indirect.Reference
+			bindings = append(bindings, indirect.Bindings...)
 		} else {
 			bindings = append(bindings, simple.Right)
 		}
@@ -381,6 +378,7 @@ func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
 func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
 	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
 		asSQL = indirect.Reference
+		bindings = append(bindings, indirect.Bindings...)
 	} else {
 		asSQL = "?"
 		bindings = append(bindings, array.Left)

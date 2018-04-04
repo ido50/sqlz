@@ -37,7 +37,7 @@ type SelectStmt struct {
 	Table           string
 	Joins           []JoinClause
 	Conditions      []WhereCondition
-	Ordering        []SQLSimpleClause
+	Ordering        []SQLStmt
 	Grouping        []string
 	GroupConditions []WhereCondition
 	Locks           []*LockClause
@@ -106,14 +106,14 @@ type OrderColumn struct {
 }
 
 // ToSQL generates SQL for an OrderColumn
-func (o OrderColumn) ToSQL() string {
+func (o OrderColumn) ToSQL(_ bool) (string, []interface{}) {
 	str := o.Column
 	if o.Desc {
 		str += " DESC"
 	} else {
 		str += " ASC"
 	}
-	return str
+	return str, nil
 }
 
 // Asc creates an OrderColumn for the provided
@@ -236,7 +236,7 @@ func (stmt *SelectStmt) Where(conditions ...WhereCondition) *SelectStmt {
 
 // OrderBy sets an ORDER BY clause for the query. Pass OrderColumn objects
 // using the Asc and Desc functions.
-func (stmt *SelectStmt) OrderBy(cols ...SQLSimpleClause) *SelectStmt  {
+func (stmt *SelectStmt) OrderBy(cols ...SQLStmt) *SelectStmt {
 	stmt.Ordering = append(stmt.Ordering, cols...)
 	return stmt
 }
@@ -355,7 +355,8 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	if len(stmt.Ordering) > 0 {
 		var ordering []string
 		for _, order := range stmt.Ordering {
-			ordering = append(ordering, order.ToSQL())
+			o, _ := order.ToSQL(false)
+			ordering = append(ordering, o)
 		}
 		clauses = append(clauses, "ORDER BY "+strings.Join(ordering, ", "))
 	}
@@ -460,7 +461,7 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
 	countStmt.OffsetRows = 0
-	countStmt.Ordering = []SQLSimpleClause{}
+	countStmt.Ordering = []SQLStmt{}
 
 	err = countStmt.GetRow(&count)
 	return count, err
@@ -477,7 +478,7 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
 	countStmt.OffsetRows = 0
-	countStmt.Ordering = []SQLSimpleClause{}
+	countStmt.Ordering = []SQLStmt{}
 
 	err = countStmt.GetRowContext(ctx, &count)
 	return count, err

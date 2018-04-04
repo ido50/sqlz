@@ -1,6 +1,8 @@
 package sqlz
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestUpdate(t *testing.T) {
 	runTests(t, func(dbz *DB) []test {
@@ -52,6 +54,13 @@ func TestUpdate(t *testing.T) {
 				dbz.Update("table").Set("something", 3).SetIf("other", 2, 3 == 1),
 				"UPDATE table SET something = ?",
 				[]interface{}{3},
+			},
+
+			test{
+				"update that uses a function with bindings",
+				dbz.Update("table").Set("something", Indirect("replace(something, ?, '')", "prefix/")),
+				"UPDATE table SET something = replace(something, ?, '')",
+				[]interface{}{"prefix/"},
 			},
 		}
 	})
