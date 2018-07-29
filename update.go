@@ -15,6 +15,8 @@ type UpdateStmt struct {
 	Conditions []WhereCondition
 	Return     []string
 	execer     Ext
+	SelectStmt *SelectStmt
+	SelectStmtAlias string
 }
 
 // Update creates a new UpdateStmt object for
@@ -80,6 +82,12 @@ func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 	return stmt
 }
 
+func (stmt *UpdateStmt) FromSelect(selStmt *SelectStmt,alias string) *UpdateStmt {
+	stmt.SelectStmt = selStmt
+	stmt.SelectStmtAlias = alias
+	return stmt
+}
+
 // ToSQL generates the UPDATE statement's SQL and returns a list of
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
@@ -111,6 +119,14 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	}
 
 	clauses = append(clauses, "SET "+strings.Join(updates, ", "))
+
+	if stmt.SelectStmt != nil && stmt.SelectStmtAlias != ""{
+		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
+		selectSQL= "("+selectSQL+") AS "+ stmt.SelectStmtAlias+" "
+		clauses = append (clauses,"FROM ")
+		clauses = append(clauses, selectSQL)
+		bindings = append(bindings, selectBindings...)
+	}
 
 	if len(stmt.Conditions) > 0 {
 		whereClause, whereBindings := parseConditions(stmt.Conditions)
@@ -220,3 +236,4 @@ func ArrayRemove(name string, value interface{}) UpdateFunction {
 		Arguments: []interface{}{Indirect(name), value},
 	}
 }
+
