@@ -483,3 +483,36 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 	err = countStmt.GetRowContext(ctx, &count)
 	return count, err
 }
+
+// GetAllAsMaps executes the SELECT statement and returns all results as a slice
+// of maps from string to empty interfaces. This is useful for intermediary
+// query where creating a struct type would be redundant
+func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	rows, err := stmt.queryer.Queryx(asSQL, bindings...)
+	if err != nil {
+		return maps, err
+	}
+
+	for rows.Next() {
+		results := make(map[string]interface{})
+		err = rows.MapScan(results)
+		if err != nil {
+			return maps, err
+		}
+
+		maps = append(maps, results)
+	}
+
+	return maps, nil
+}
+
+// GetRowAsMap executes the SELECT statement and returns the first result as a
+// map from string to empty interfaces. This is useful for intermediary query
+// where creating a struct type would be redundant
+func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	results = make(map[string]interface{})
+	err = stmt.queryer.QueryRowx(asSQL, bindings...).MapScan(results)
+	return results, err
+}
