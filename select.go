@@ -516,3 +516,10 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 	err = stmt.queryer.QueryRowx(asSQL, bindings...).MapScan(results)
 	return results, err
 }
+
+// GetAllAsRows executes the SELECT statement and returns an sqlx.Rows object
+// to use for iteration.
+func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.queryer.Queryx(asSQL, bindings...)
+}
