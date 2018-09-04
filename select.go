@@ -494,6 +494,8 @@ func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error
 		return maps, err
 	}
 
+	defer rows.Close()
+
 	for rows.Next() {
 		results := make(map[string]interface{})
 		err = rows.MapScan(results)
@@ -502,6 +504,11 @@ func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error
 		}
 
 		maps = append(maps, results)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return maps, err
 	}
 
 	return maps, nil
@@ -518,7 +525,8 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 }
 
 // GetAllAsRows executes the SELECT statement and returns an sqlx.Rows object
-// to use for iteration.
+// to use for iteration. It is the caller's responsibility to close the cursor
+// with Close().
 func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	return stmt.queryer.Queryx(asSQL, bindings...)
