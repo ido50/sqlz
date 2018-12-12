@@ -10,6 +10,7 @@ import (
 
 // UpdateStmt represents an UPDATE statement
 type UpdateStmt struct {
+	*Statment
 	Table      string
 	Updates    map[string]interface{}
 	Conditions []WhereCondition
@@ -26,6 +27,7 @@ func (db *DB) Update(table string) *UpdateStmt {
 		Table:   table,
 		Updates: make(map[string]interface{}),
 		execer:  db.DB,
+		Statment: &Statment{db.ErrHandlers},
 	}
 }
 
@@ -36,8 +38,10 @@ func (tx *Tx) Update(table string) *UpdateStmt {
 		Table:   table,
 		Updates: make(map[string]interface{}),
 		execer:  tx.Tx,
+		Statment: &Statment{tx.ErrHandlers},
 	}
 }
+
 
 // Set receives the name of a column and a new value. Multiple calls to Set
 // can be chained together to modify multiple columns. Set can also be chained
@@ -155,14 +159,19 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // sql.Result struct and an error if the query failed.
 func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
-	return stmt.execer.Exec(asSQL, bindings...)
+	res, err = stmt.execer.Exec(asSQL, bindings...)
+	stmt.HandlerError(err)
+	return res, err
 }
 
 // ExecContext executes the UPDATE statement, returning the standard
 // sql.Result struct and an error if the query failed.
 func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
-	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return res, err
+
 }
 
 // GetRow executes an UPDATE statement with a RETURNING clause
@@ -172,7 +181,9 @@ func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 // are returned)
 func (stmt *UpdateStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
+	err := sqlx.Get(stmt.execer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetRowContext executes an UPDATE statement with a RETURNING clause
@@ -182,7 +193,9 @@ func (stmt *UpdateStmt) GetRow(into interface{}) error {
 // are returned)
 func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+	err := sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetAll executes an UPDATE statement with a RETURNING clause
@@ -190,7 +203,9 @@ func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) err
 // the provided slice variable
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.Select(stmt.execer, into, asSQL, bindings...)
+	err := sqlx.Select(stmt.execer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetAllContext executes an UPDATE statement with a RETURNING clause
@@ -198,7 +213,9 @@ func (stmt *UpdateStmt) GetAll(into interface{}) error {
 // the provided slice variable
 func (stmt *UpdateStmt) GetAllContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
+	err := sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // UpdateFunction represents a function call in the context of

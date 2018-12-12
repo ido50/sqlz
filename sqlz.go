@@ -29,11 +29,13 @@ type Queryer interface {
 // DB is a wrapper around sqlx.DB (which is a wrapper around sql.DB)
 type DB struct {
 	*sqlx.DB
+	ErrHandlers []func(err error)
 }
 
 // Tx is a wrapper around sqlx.Tx (which is a wrapper around sql.Tx)
 type Tx struct {
 	*sqlx.Tx
+	ErrHandlers []func(err error)
 }
 
 // SQLStmt is an interface representing a general SQL statement. All
@@ -46,8 +48,12 @@ type SQLStmt interface {
 // New creates a new DB instance from an underlying sql.DB object.
 // It requires the name of the SQL driver in order to use the correct
 // placeholders when generating SQL
-func New(db *sql.DB, driverName string) *DB {
-	return &DB{DB: sqlx.NewDb(db, driverName)}
+func New(db *sql.DB, driverName string, errHandlersFuncs ...func(err error)) *DB {
+	errHandlers := make([]func(err error), len(errHandlersFuncs), len(errHandlersFuncs))
+	for i, h := range errHandlersFuncs {
+		errHandlers[i] = h
+	}
+	return &DB{DB: sqlx.NewDb(db, driverName), ErrHandlers: errHandlers }
 }
 
 // Newx creates a new DB instance from an underlying sqlx.DB object
@@ -65,7 +71,7 @@ func (db *DB) Transactional(f func(tx *Tx) error) error {
 		return fmt.Errorf("failed starting transaction: %s", err)
 	}
 
-	err = f(&Tx{tx})
+	err = f(&Tx{Tx: tx, ErrHandlers:db.ErrHandlers})
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -89,7 +95,7 @@ func (db *DB) TransactionalContext(ctx context.Context, opts *sql.TxOptions, f f
 		return fmt.Errorf("failed starting transaction: %s", err)
 	}
 
-	err = f(&Tx{tx})
+	err = f(&Tx{Tx: tx, ErrHandlers:db.ErrHandlers})
 	if err != nil {
 		tx.Rollback()
 		return err

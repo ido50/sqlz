@@ -31,6 +31,7 @@ const (
 
 // SelectStmt represents a SELECT statement
 type SelectStmt struct {
+	*Statment
 	IsDistinct      bool
 	DistinctColumns []string
 	Columns         []string
@@ -136,6 +137,7 @@ func (db *DB) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
 		Columns: append([]string{}, cols...),
 		queryer: db.DB,
+		Statment: &Statment{db.ErrHandlers},
 	}
 }
 
@@ -147,6 +149,7 @@ func (tx *Tx) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
 		Columns: append([]string{}, cols...),
 		queryer: tx.Tx,
+		Statment: &Statment{tx.ErrHandlers},
 	}
 }
 
@@ -424,7 +427,9 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // multiple columns were selected).
 func (stmt *SelectStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.Get(stmt.queryer, into, asSQL, bindings...)
+	err := sqlx.Get(stmt.queryer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetRowContext executes the SELECT statement and loads the first
@@ -433,21 +438,27 @@ func (stmt *SelectStmt) GetRow(into interface{}) error {
 // multiple columns were selected).
 func (stmt *SelectStmt) GetRowContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.GetContext(ctx, stmt.queryer, into, asSQL, bindings...)
+	err := sqlx.GetContext(ctx, stmt.queryer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetAll executes the SELECT statement and loads all the
 // results into the provided slice variable.
 func (stmt *SelectStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.Select(stmt.queryer, into, asSQL, bindings...)
+	err := sqlx.Select(stmt.queryer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetAllContext executes the SELECT statement and loads all the
 // results into the provided slice variable.
 func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
-	return sqlx.SelectContext(ctx, stmt.queryer, into, asSQL, bindings...)
+	err := sqlx.SelectContext(ctx, stmt.queryer, into, asSQL, bindings...)
+	stmt.HandlerError(err)
+	return err
 }
 
 // GetCount executes the SELECT statement disregarding limits,
@@ -488,6 +499,9 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 // of maps from string to empty interfaces. This is useful for intermediary
 // query where creating a struct type would be redundant
 func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error) {
+	defer func() {
+		stmt.HandlerError(err)
+	}()
 	asSQL, bindings := stmt.ToSQL(true)
 	rows, err := stmt.queryer.Queryx(asSQL, bindings...)
 	if err != nil {
@@ -521,6 +535,7 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 	asSQL, bindings := stmt.ToSQL(true)
 	results = make(map[string]interface{})
 	err = stmt.queryer.QueryRowx(asSQL, bindings...).MapScan(results)
+	stmt.HandlerError(err)
 	return results, err
 }
 
@@ -529,5 +544,7 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 // with Close().
 func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
-	return stmt.queryer.Queryx(asSQL, bindings...)
+	rows, err = stmt.queryer.Queryx(asSQL, bindings...)
+	stmt.HandlerError(err)
+	return rows, err
 }
