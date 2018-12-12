@@ -11,6 +11,7 @@ import (
 
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
+	*Statment
 	InsCols        []string
 	InsVals        []interface{}
 	SelectStmt     *SelectStmt
@@ -27,7 +28,9 @@ func (db *DB) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
 		Table:  table,
 		execer: db.DB,
+		Statment: &Statment{db.ErrHandlers},
 	}
+
 }
 
 // InsertInto creates a new InsertStmt object for the
@@ -36,6 +39,7 @@ func (tx *Tx) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
 		Table:  table,
 		execer: tx.Tx,
+		Statment: &Statment{tx.ErrHandlers},
 	}
 }
 
@@ -185,14 +189,18 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // sql.Result struct and an error if the query failed.
 func (stmt *InsertStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
-	return stmt.execer.Exec(asSQL, bindings...)
+	res, err = stmt.execer.Exec(asSQL, bindings...)
+	stmt.Statment.HandlerError(err)
+	return res, err
 }
 
 // ExecContext executes the INSERT statement, returning the standard
 // sql.Result struct and an error if the query failed.
 func (stmt *InsertStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
-	return stmt.execer.ExecContext(ctx, asSQL, bindings...)
+	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
+	stmt.Statment.HandlerError(err)
+	return res, err
 }
 
 // GetRow executes an INSERT statement with a RETURNING clause
