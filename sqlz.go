@@ -53,7 +53,7 @@ func New(db *sql.DB, driverName string, errHandlersFuncs ...func(err error)) *DB
 	for i, h := range errHandlersFuncs {
 		errHandlers[i] = h
 	}
-	return &DB{DB: sqlx.NewDb(db, driverName), ErrHandlers: errHandlers }
+	return &DB{DB: sqlx.NewDb(db, driverName), ErrHandlers: errHandlers}
 }
 
 // Newx creates a new DB instance from an underlying sqlx.DB object
@@ -71,7 +71,7 @@ func (db *DB) Transactional(f func(tx *Tx) error) error {
 		return fmt.Errorf("failed starting transaction: %s", err)
 	}
 
-	err = f(&Tx{Tx: tx, ErrHandlers:db.ErrHandlers})
+	err = f(&Tx{Tx: tx, ErrHandlers: db.ErrHandlers})
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -95,7 +95,7 @@ func (db *DB) TransactionalContext(ctx context.Context, opts *sql.TxOptions, f f
 		return fmt.Errorf("failed starting transaction: %s", err)
 	}
 
-	err = f(&Tx{Tx: tx, ErrHandlers:db.ErrHandlers})
+	err = f(&Tx{Tx: tx, ErrHandlers: db.ErrHandlers})
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -224,6 +224,11 @@ func Like(col string, value interface{}) SimpleCondition {
 // NotLike represents a wildcard non-equality condition ("NOT LIKE" operator)
 func NotLike(col string, value interface{}) SimpleCondition {
 	return SimpleCondition{col, value, "NOT LIKE"}
+}
+
+// ILike represents a wildcard equality condition ("ILIKE" operator)
+func ILike(col string, value interface{}) SimpleCondition {
+	return SimpleCondition{col, value, "ILIKE"}
 }
 
 // IsNull represents a simple nullity condition ("IS NULL" operator)
