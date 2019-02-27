@@ -15,18 +15,33 @@ type JoinType int
 // String returns the string representation of the
 // join type (e.g. "FULL JOIN")
 func (j JoinType) String() string {
-	return []string{"INNER", "LEFT", "RIGHT", "FULL"}[int(j)] + " JOIN"
+	str := []string{"INNER", "LEFT", "RIGHT", "FULL"}[int(j%4)] + " JOIN"
+	if j.IsLateral() {
+		str += " LATERAL"
+	}
+
+	return str
+}
+
+func (j JoinType) IsLateral() bool {
+	return int(InnerLateralJoin) <= int(j) && int(j) <= int(RightLateralJoin)
 }
 
 // InnerJoin represents an inner join
 // LeftJoin represents a left join
 // RightJoin represents a right join
 // FullJoin represents a full join
+// InnerLateralJoin represents an inner lateral join
+// LeftLateralJoin represents a left lateral join
+// RightLateralJoin represents a right lateral join
 const (
 	InnerJoin JoinType = iota
 	LeftJoin
 	RightJoin
 	FullJoin
+	InnerLateralJoin
+	LeftLateralJoin
+	RightLateralJoin
 )
 
 // SelectStmt represents a SELECT statement
@@ -228,6 +243,21 @@ func (stmt *SelectStmt) InnerJoinRS(rs *SelectStmt, as string, conds ...WhereCon
 // results of a sub-query
 func (stmt *SelectStmt) FullJoinRS(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(FullJoin, as, rs, conds...)
+}
+
+
+func (stmt *SelectStmt) LeftLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+	return stmt.Join(LeftLateralJoin, as, rs, conds...)
+}
+
+
+func (stmt *SelectStmt) RightLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+	return stmt.Join(RightLateralJoin, as, rs, conds...)
+}
+
+
+func (stmt *SelectStmt) InnerLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+	return stmt.Join(InnerLateralJoin, as, rs, conds...)
 }
 
 // Where creates one or more WHERE conditions for the SELECT statement.

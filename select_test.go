@@ -50,7 +50,7 @@ func TestSelect(t *testing.T) {
 				"SELECT a.id, a.value FROM table a INNER JOIN (SELECT id, MAX(value) value FROM table GROUP BY id) b ON a.id = b.id WHERE a.id = ?",
 				[]interface{}{1},
 			},
-
+			
 			test{
 				"select with array comparisons",
 				dbz.Select("*").From("table").Where(EqAny("array_col", 3), GtAll("other_array_col", 1), NeAny("yet_another_col", Indirect("NOW()"))),
@@ -98,6 +98,37 @@ func TestSelect(t *testing.T) {
 				dbz.Select("*").From("table").Lock(ForNoKeyUpdate().OfTables("table").NoWait()),
 				"SELECT * FROM table FOR NO KEY UPDATE OF table NOWAIT",
 				[]interface{}{},
+			},
+
+			test{
+				"select with a left lateral join",
+				dbz.Select("a.id, a.value").From("table a").Where(Eq("a.id", 1)).LeftLateralJoin(
+					dbz.Select("id, MAX(value) value").From("table").GroupBy("id"),
+					"b",
+					Eq("a.id", Indirect("b.id")),
+				),
+				"SELECT a.id, a.value FROM table a LEFT JOIN LATERAL (SELECT id, MAX(value) value FROM table GROUP BY id) b ON a.id = b.id WHERE a.id = ?",
+				[]interface{}{1},
+			},
+			test{
+				"select with an inner lateral join",
+				dbz.Select("a.id, a.value").From("table a").Where(Eq("a.id", 1)).InnerLateralJoin(
+						dbz.Select("id, MAX(value) value").From("table").GroupBy("id"),
+						"b",
+						SQLCond("True"),
+						),
+				"SELECT a.id, a.value FROM table a INNER JOIN LATERAL (SELECT id, MAX(value) value FROM table GROUP BY id) b ON True WHERE a.id = ?",
+				[]interface{}{1},
+			},
+			test{
+				"select with a right lateral join",
+				dbz.Select("a.id, a.value").From("table a").Where(Eq("a.id", 1)).RightLateralJoin(
+					dbz.Select("count").From("table").Where(Gt("a.value", 0)),
+					"counts",
+					Eq("a.id", Indirect("b.id")),
+				),
+				"SELECT a.id, a.value FROM table a RIGHT JOIN LATERAL (SELECT count FROM table WHERE a.value > ?) counts ON a.id = b.id WHERE a.id = ?",
+				[]interface{}{0, 1},
 			},
 		}
 	})
