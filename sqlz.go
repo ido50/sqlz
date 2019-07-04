@@ -135,6 +135,12 @@ type AndOrCondition struct {
 	Conditions []WhereCondition
 }
 
+// PreCondition represents pre-condition operator
+type PreCondition struct {
+	Pre string
+	Condition WhereCondition
+}
+
 // SubqueryCondition is a WHERE condition on the results
 // of a sub-query.
 type SubqueryCondition struct {
@@ -184,6 +190,11 @@ func And(conds ...WhereCondition) AndOrCondition {
 // (representing OR conditions).
 func Or(conds ...WhereCondition) AndOrCondition {
 	return AndOrCondition{true, conds}
+}
+
+// Not represents a pre condition ("NOT" operator)
+func Not(cond WhereCondition) PreCondition {
+	return PreCondition{"NOT", cond}
 }
 
 // Eq represents a simple equality condition ("=" operator)
@@ -296,67 +307,72 @@ type ArrayCondition struct {
 	Left     interface{}
 	Operator string
 	Type     string
-	Right    string
+	Right    interface{}
 }
 
 // EqAny creates an "= ANY" condition on an array column
-func EqAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "=", "ANY", col}
+func EqAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "=", "ANY", arr}
 }
 
-// NeAny creates an "<> ANY" condition on an array column
-func NeAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<>", "ANY", col}
+// NeAny creates an "<> ANY" condition on an array
+func NeAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<>", "ANY", arr}
 }
 
-// LtAny creates an "< ANY" condition on an array column
-func LtAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<", "ANY", col}
+// LtAny creates an "< ANY" condition on an array
+func LtAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<", "ANY", arr}
 }
 
-// LteAny creates an "<= ANY" condition on an array column
-func LteAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<=", "ANY", col}
+// LteAny creates an "<= ANY" condition on an array
+func LteAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<=", "ANY", arr}
 }
 
-// GtAny creates an "> ANY" condition on an array column
-func GtAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">", "ANY", col}
+// GtAny creates an "> ANY" condition on an array
+func GtAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">", "ANY", arr}
 }
 
-// GteAny creates an ">= ANY" condition on an array column
-func GteAny(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">=", "ANY", col}
+// GteAny creates an ">= ANY" condition on an array
+func GteAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">=", "ANY", arr}
 }
 
-// EqAll creates an "= ALL" condition on an array column
-func EqAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "=", "ALL", col}
+// EqAll creates an "= ALL" condition on an array
+func EqAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "=", "ALL", arr}
 }
 
-// NeAll creates an "<> ALL" condition on an array column
-func NeAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<>", "ALL", col}
+// NeAll creates an "<> ALL" condition on an array
+func NeAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<>", "ALL", arr}
 }
 
-// LtAll creates an "< ALL" condition on an array column
-func LtAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<", "ALL", col}
+// LtAll creates an "< ALL" condition on an array
+func LtAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<", "ALL", arr}
 }
 
-// LteAll creates an "<= ALL" condition on an array column
-func LteAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, "<=", "ALL", col}
+// LteAll creates an "<= ALL" condition on an array
+func LteAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "<=", "ALL", arr}
 }
 
-// GtAll creates an "> ALL" condition on an array column
-func GtAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">", "ALL", col}
+// GtAll creates an "> ALL" condition on an array
+func GtAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">", "ALL", arr}
 }
 
-// GteAll creates an ">= ALL" condition on an array column
-func GteAll(col string, value interface{}) ArrayCondition {
-	return ArrayCondition{value, ">=", "ALL", col}
+// GteAll creates an ">= ALL" condition on an array
+func GteAll(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, ">=", "ALL", arr}
+}
+
+// LikeAny creates an "Like ANY" condition on an array
+func LikeAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "LIKE", "ANY", arr}
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
@@ -387,15 +403,28 @@ func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
+	var rightAsSQL string
+	var leftAsSQL string
+
 	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
-		asSQL = indirect.Reference
+		leftAsSQL = indirect.Reference
 		bindings = append(bindings, indirect.Bindings...)
 	} else {
-		asSQL = "?"
+		leftAsSQL = "?"
 		bindings = append(bindings, array.Left)
 	}
-	asSQL += " " + array.Operator + " " + array.Type + "(" + array.Right + ")"
 
+
+	switch array.Right.(type) {
+	case string:
+		rightAsSQL = fmt.Sprintf("%v", array.Right)
+	default:
+		rightAsSQL = "?"
+		bindings = append(bindings, array.Right)
+	}
+
+
+	asSQL = leftAsSQL + " " + array.Operator + " " + array.Type + "(" + rightAsSQL + ")"
 	return asSQL, bindings
 }
 
@@ -434,6 +463,15 @@ func (andOr AndOrCondition) Parse() (asSQL string, bindings []interface{}) {
 		op = " OR "
 	}
 	return "(" + strings.Join(sqls, op) + ")", bindings
+}
+
+// Parse implements the WhereCondition interface, generating SQL from
+// the condition
+func (pre PreCondition) Parse() (asSQL string, bindings []interface{}) {
+	innerSQL, innerBindings := pre.Condition.Parse()
+	bindings = append(bindings, innerBindings...)
+
+	return pre.Pre +" ("  +innerSQL + ")", bindings
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
