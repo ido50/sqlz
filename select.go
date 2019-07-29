@@ -60,6 +60,7 @@ type SelectStmt struct {
 	LimitTo         int64
 	OffsetFrom      int64
 	OffsetRows      int64
+	orderWithNulls orderWithNulls
 	queryer         Queryer
 }
 
@@ -119,6 +120,11 @@ const (
 type OrderColumn struct {
 	Column string
 	Desc   bool
+}
+
+type orderWithNulls struct {
+	Enabled bool
+	First bool
 }
 
 // ToSQL generates SQL for an OrderColumn
@@ -267,6 +273,22 @@ func (stmt *SelectStmt) Where(conditions ...WhereCondition) *SelectStmt {
 	return stmt
 }
 
+// OrderBy with null values first
+func (stmt *SelectStmt) WithNullsFirst() *SelectStmt {
+	stmt.orderWithNulls.Enabled = true
+	stmt.orderWithNulls.First = true
+
+	return stmt
+}
+
+// OrderBy with null values last
+func (stmt *SelectStmt) WithNullsLast() *SelectStmt {
+	stmt.orderWithNulls.Enabled = true
+	stmt.orderWithNulls.First = false
+
+	return stmt
+}
+
 // OrderBy sets an ORDER BY clause for the query. Pass OrderColumn objects
 // using the Asc and Desc functions.
 func (stmt *SelectStmt) OrderBy(cols ...SQLStmt) *SelectStmt {
@@ -392,6 +414,14 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 			ordering = append(ordering, o)
 		}
 		clauses = append(clauses, "ORDER BY "+strings.Join(ordering, ", "))
+
+		if stmt.orderWithNulls.Enabled {
+			if stmt.orderWithNulls.First {
+				clauses = append(clauses, "NULLS FIRST")
+			} else {
+				clauses = append(clauses, "NULLS LAST")
+			}
+		}
 	}
 
 	if stmt.LimitTo > 0 {
