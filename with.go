@@ -136,3 +136,11 @@ func (stmt *WithStmt) GetAllContext(ctx context.Context, into interface{}) error
 	asSQL, bindings := stmt.ToSQL(true)
 	return sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 }
+
+// GetAllAsRows executes the WITH statement and returns an sqlx.Rows object
+// to use for iteration. It is the caller's responsibility to close the cursor
+// with Close().
+func (stmt *WithStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	return stmt.execer.Queryx(asSQL, bindings...)
+}
