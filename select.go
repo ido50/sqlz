@@ -60,7 +60,7 @@ type SelectStmt struct {
 	LimitTo         int64
 	OffsetFrom      int64
 	OffsetRows      int64
-	orderWithNulls orderWithNulls
+	orderWithNulls  orderWithNulls
 	queryer         Queryer
 }
 
@@ -124,7 +124,7 @@ type OrderColumn struct {
 
 type orderWithNulls struct {
 	Enabled bool
-	First bool
+	First   bool
 }
 
 // ToSQL generates SQL for an OrderColumn
@@ -156,8 +156,8 @@ func Desc(col string) OrderColumn {
 // Select("one", "two t", "MAX(three) maxThree")
 func (db *DB) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
-		Columns: append([]string{}, cols...),
-		queryer: db.DB,
+		Columns:  append([]string{}, cols...),
+		queryer:  db.DB,
 		Statment: &Statment{db.ErrHandlers},
 	}
 }
@@ -168,8 +168,8 @@ func (db *DB) Select(cols ...string) *SelectStmt {
 // Select("one", "two t", "MAX(three) maxThree")
 func (tx *Tx) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
-		Columns: append([]string{}, cols...),
-		queryer: tx.Tx,
+		Columns:  append([]string{}, cols...),
+		queryer:  tx.Tx,
 		Statment: &Statment{tx.ErrHandlers},
 	}
 }
@@ -251,18 +251,15 @@ func (stmt *SelectStmt) FullJoinRS(rs *SelectStmt, as string, conds ...WhereCond
 	return stmt.Join(FullJoin, as, rs, conds...)
 }
 
-
-func (stmt *SelectStmt) LeftLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+func (stmt *SelectStmt) LeftLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(LeftLateralJoin, as, rs, conds...)
 }
 
-
-func (stmt *SelectStmt) RightLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+func (stmt *SelectStmt) RightLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(RightLateralJoin, as, rs, conds...)
 }
 
-
-func (stmt *SelectStmt) InnerLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt{
+func (stmt *SelectStmt) InnerLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(InnerLateralJoin, as, rs, conds...)
 }
 
@@ -605,6 +602,16 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	rows, err = stmt.queryer.Queryx(asSQL, bindings...)
+	stmt.HandlerError(err)
+	return rows, err
+}
+
+// GetAllAsRowsContext executes the SELECT statement and returns an sqlx.Rows object
+// to use for iteration. It is the caller's responsibility to close the cursor
+// with Close().
+func (stmt *SelectStmt) GetAllAsRowsContext(ctx context.Context) (rows *sqlx.Rows, err error) {
+	asSQL, bindings := stmt.ToSQL(true)
+	rows, err = stmt.queryer.QueryxContext(ctx, asSQL, bindings...)
 	stmt.HandlerError(err)
 	return rows, err
 }
