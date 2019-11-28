@@ -83,6 +83,14 @@ func TestInsert(t *testing.T) {
 				"INSERT OR REPLACE INTO table (id, name, date) VALUES (?, ?, ?)",
 				[]interface{}{1, "My Name", 96969696},
 			},
+
+			test{
+				"insert with multiple values",
+				dbz.InsertInto("table").Columns("id", "name").
+					ValueMultiple([][]interface{}{{1, "My Name"}, {2, "John"}, {3, "Golang"}}),
+				"INSERT INTO table (id, name) VALUES (?, ?), (?, ?), (?, ?)",
+				[]interface{}{1, "My Name", 2, "John", 3, "Golang"},
+			},
 		}
 	})
 }
