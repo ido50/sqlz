@@ -12,33 +12,33 @@ import (
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
 	*Statment
-	InsCols        []string
-	InsVals        []interface{}
-	SelectStmt     *SelectStmt
-	Table          string
-	Return         []string
-	Conflicts      []*ConflictClause
-	execer         Ext
-	sqliteConflict string
+	InsCols         []string
+	InsVals         []interface{}
+	InsMultipleVals [][]interface{}
+	SelectStmt      *SelectStmt
+	Table           string
+	Return          []string
+	Conflicts       []*ConflictClause
+	execer          Ext
+	sqliteConflict  string
 }
 
 // InsertInto creates a new InsertStmt object for the
 // provided table
 func (db *DB) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
-		Table:  table,
-		execer: db.DB,
+		Table:    table,
+		execer:   db.DB,
 		Statment: &Statment{db.ErrHandlers},
 	}
-
 }
 
 // InsertInto creates a new InsertStmt object for the
 // provided table
 func (tx *Tx) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
-		Table:  table,
-		execer: tx.Tx,
+		Table:    table,
+		execer:   tx.Tx,
 		Statment: &Statment{tx.ErrHandlers},
 	}
 }
@@ -63,6 +63,14 @@ func (stmt *InsertStmt) ValueMap(vals map[string]interface{}) *InsertStmt {
 	for col, val := range vals {
 		stmt.InsCols = append(stmt.InsCols, col)
 		stmt.InsVals = append(stmt.InsVals, val)
+	}
+	return stmt
+}
+
+// ValueMultiple receives an array of interfaces in order to insert multiple records using the same insert statement
+func (stmt *InsertStmt) ValueMultiple(vals [][]interface{}) *InsertStmt {
+	for _, val := range vals {
+		stmt.InsMultipleVals = append(stmt.InsMultipleVals, val)
 	}
 	return stmt
 }
@@ -144,22 +152,18 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		clauses = append(clauses, selectSQL)
 		bindings = append(bindings, selectBindings...)
 	} else if len(stmt.InsVals) > 0 {
-		var placeholders []string
-		for _, val := range stmt.InsVals {
-			if indirect, isIndirect := val.(IndirectValue); isIndirect {
-				placeholders = append(placeholders, indirect.Reference)
-				bindings = append(bindings, indirect.Bindings...)
-			} else if builder, isBuilder := val.(JSONBBuilder); isBuilder {
-				bSQL, bBindings := builder.Parse()
-				placeholders = append(placeholders, bSQL)
-				bindings = append(bindings, bBindings...)
-			} else {
-				placeholders = append(placeholders, "?")
-				bindings = append(bindings, val)
-			}
+		placeholders, bindingsToAdd := parseInsertValues(stmt.InsVals)
+		bindings = append(bindings, bindingsToAdd...)
+		clauses = append(clauses, "VALUES ("+strings.Join(placeholders, ", ")+")")
+	} else if len(stmt.InsMultipleVals) > 0 {
+		var multipleValues []string
+		for _, insVals := range stmt.InsMultipleVals {
+			placeholders, bindingsToAdd := parseInsertValues(insVals)
+			bindings = append(bindings, bindingsToAdd...)
+			multipleValues = append(multipleValues, "("+strings.Join(placeholders, ", ")+")")
 		}
 
-		clauses = append(clauses, "VALUES ("+strings.Join(placeholders, ", ")+")")
+		clauses = append(clauses, "VALUES "+strings.Join(multipleValues, ", "))
 	}
 
 	for _, conflict := range stmt.Conflicts {
@@ -354,4 +358,23 @@ func (conflict *ConflictClause) ToSQL() (asSQL string, bindings []interface{}) {
 	}
 
 	return strings.Join(words, " "), bindings
+}
+
+// parseInsertValues adds placeholders and binding for every insert value, by parsing the type of the insert value
+func parseInsertValues(insVals []interface{}) (placeholders []string, bindingsToAdd []interface{}) {
+	for _, val := range insVals {
+		if indirect, isIndirect := val.(IndirectValue); isIndirect {
+			placeholders = append(placeholders, indirect.Reference)
+			bindingsToAdd = append(bindingsToAdd, indirect.Bindings...)
+		} else if builder, isBuilder := val.(JSONBBuilder); isBuilder {
+			bSQL, bBindings := builder.Parse()
+			placeholders = append(placeholders, bSQL)
+			bindingsToAdd = append(bindingsToAdd, bBindings...)
+		} else {
+			placeholders = append(placeholders, "?")
+			bindingsToAdd = append(bindingsToAdd, val)
+		}
+
+	}
+	return placeholders, bindingsToAdd
 }
