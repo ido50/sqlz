@@ -48,6 +48,7 @@ const (
 type SelectStmt struct {
 	*Statment
 	IsDistinct      bool
+	IsUnionAll      bool
 	DistinctColumns []string
 	Columns         []string
 	Table           string
@@ -56,6 +57,7 @@ type SelectStmt struct {
 	Ordering        []SQLStmt
 	Grouping        []string
 	GroupConditions []WhereCondition
+	Unions          []*SelectStmt
 	Locks           []*LockClause
 	LimitTo         int64
 	OffsetFrom      int64
@@ -465,6 +467,19 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		clauses = append(clauses, strings.Join(lockClause, " "))
 	}
 
+	if len(stmt.Unions) > 0 {
+		cmd := "UNION"
+		if stmt.IsUnionAll {
+			cmd += " ALL"
+		}
+
+		for _, union := range stmt.Unions {
+			u, b := union.ToSQL(false)
+			bindings = append(bindings, b...)
+			clauses = append(clauses, fmt.Sprintf("%s %s", cmd, u))
+		}
+	}
+
 	asSQL = strings.Join(clauses, " ")
 
 	if rebind {
@@ -614,4 +629,17 @@ func (stmt *SelectStmt) GetAllAsRowsContext(ctx context.Context) (rows *sqlx.Row
 	rows, err = stmt.queryer.QueryxContext(ctx, asSQL, bindings...)
 	stmt.HandlerError(err)
 	return rows, err
+}
+
+// Union adds the 'UNION' command between two SELECT statements or more
+func (stmt *SelectStmt) Union(statements ...*SelectStmt) *SelectStmt {
+	stmt.Unions = append(stmt.Unions, statements...)
+	return stmt
+}
+
+// Union adds the 'UNION ALL' command between two SELECT statements or more
+func (stmt *SelectStmt) UnionAll(statements ...*SelectStmt) *SelectStmt {
+	stmt.IsUnionAll = true
+	stmt.Union(statements...)
+	return stmt
 }
