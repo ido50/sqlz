@@ -371,7 +371,9 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		clauses = append(clauses, strings.Join(stmt.Columns, ", "))
 	}
 
-	clauses = append(clauses, "FROM "+stmt.Table)
+	if len(stmt.Table) > 0 {
+		clauses = append(clauses, "FROM "+stmt.Table)
+	}
 
 	for _, join := range stmt.Joins {
 		onClause, joinBindings := parseConditions(join.Conditions)
