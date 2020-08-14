@@ -8,7 +8,7 @@
 
 ---
 
-sqlz is an un-opinionated, un-obtrusive SQL query builder for Go projects, based on [sqlx](https://github.com/jmoiron/sqlx/).
+sqlz (pronounced "sequelize") is an un-opinionated, un-obtrusive SQL query builder for Go projects, based on [sqlx](https://github.com/jmoiron/sqlx/).
 
 As opposed to other query builders, sqlz does not mean to bridge the gap between different SQL servers and implementations by
 providing a unified interface. Instead, it aims to support an extended SQL syntax that may be implementation-specific. For
@@ -26,20 +26,11 @@ in order to understand how row scanning is performed. You may need to add `db` s
 sqlz provides a comfortable API for running queries in a transaction, and will automatically commit or rollback the
 transaction as necessary.
 
-**NOTE 1**: "sqlz" is currently a working name, and may change soon.
-
-**NOTE 2**: sqlz is in an early stage, currently mostly targeting PostgreSQL. There's much more work to do, but it's
-definitely usable. API may change, though I'm not currently planning on doing so.
-
 ## Install
-
-To install sqlz globally:
 
 ```go
 go get -u github.com/ido50/sqlz
 ```
-
-Alternatively, use your preferred Go depedency manager to vendor sqlz into your projects.
 
 ## Usage
 
@@ -55,6 +46,7 @@ import (
     "fmt"
     "database/sql"
     "github.com/ido50/sqlz"
+    _ "sql driver of choice"
 )
 
 func main() {

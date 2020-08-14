@@ -1,11 +1,10 @@
-// Package sqlz implements an SQL query builder based on
-// github.com/jmoiron/sqlx.
 package sqlz
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -48,12 +47,14 @@ type SQLStmt interface {
 // New creates a new DB instance from an underlying sql.DB object.
 // It requires the name of the SQL driver in order to use the correct
 // placeholders when generating SQL
-func New(db *sql.DB, driverName string, errHandlersFuncs ...func(err error)) *DB {
-	errHandlers := make([]func(err error), len(errHandlersFuncs), len(errHandlersFuncs))
-	for i, h := range errHandlersFuncs {
-		errHandlers[i] = h
+func New(db *sql.DB, driverName string, errHandlerFuncs ...func(err error)) *DB {
+	errHandlers := make([]func(err error), len(errHandlerFuncs))
+	copy(errHandlers, errHandlerFuncs)
+
+	return &DB{
+		DB:          sqlx.NewDb(db, driverName),
+		ErrHandlers: errHandlers,
 	}
-	return &DB{DB: sqlx.NewDb(db, driverName), ErrHandlers: errHandlers}
 }
 
 // Newx creates a new DB instance from an underlying sqlx.DB object
@@ -65,45 +66,38 @@ func Newx(db *sqlx.DB) *DB {
 // function must receive an sqlz Tx object, and return an error. If the
 // function returns an error, the transaction is automatically rolled
 // back. Otherwise, the transaction is committed.
-func (db *DB) Transactional(f func(tx *Tx) error) error {
-	tx, err := db.Beginx()
-	if err != nil {
-		return fmt.Errorf("failed starting transaction: %s", err)
+func (db *DB) Transactional(f func(tx *Tx) error, opts ...*sql.TxOptions) error {
+	var lastOpts *sql.TxOptions
+	if len(opts) > 0 {
+		lastOpts = opts[len(opts)-1]
 	}
 
-	err = f(&Tx{Tx: tx, ErrHandlers: db.ErrHandlers})
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("failed committing transaction: %s", err)
-	}
-
-	return nil
+	return db.TransactionalContext(context.Background(), lastOpts, f)
 }
 
 // TransactionalContext runs the provided function inside a transaction. The
 // function must receive an sqlz Tx object, and return an error. If the
 // function returns an error, the transaction is automatically rolled
 // back. Otherwise, the transaction is committed.
-func (db *DB) TransactionalContext(ctx context.Context, opts *sql.TxOptions, f func(tx *Tx) error) error {
+func (db *DB) TransactionalContext(
+	ctx context.Context,
+	opts *sql.TxOptions,
+	f func(tx *Tx) error,
+) error {
 	tx, err := db.BeginTxx(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("failed starting transaction: %s", err)
+		return fmt.Errorf("failed starting transaction: %w", err)
 	}
 
 	err = f(&Tx{Tx: tx, ErrHandlers: db.ErrHandlers})
 	if err != nil {
-		tx.Rollback()
+		tx.Rollback() // nolint: errcheck
 		return err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return fmt.Errorf("failed committing transaction: %s", err)
+		return fmt.Errorf("failed committing transaction: %w", err)
 	}
 
 	return nil
@@ -137,7 +131,7 @@ type AndOrCondition struct {
 
 // PreCondition represents pre-condition operator
 type PreCondition struct {
-	Pre string
+	Pre       string
 	Condition WhereCondition
 }
 
@@ -388,6 +382,7 @@ func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
 		} else {
 			bindings = append(bindings, simple.Right)
 		}
+
 		asSQL += " " + placeholder
 	}
 
@@ -403,8 +398,7 @@ func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
-	var rightAsSQL string
-	var leftAsSQL string
+	var rightAsSQL, leftAsSQL string
 
 	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
 		leftAsSQL = indirect.Reference
@@ -414,18 +408,19 @@ func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
 		bindings = append(bindings, array.Left)
 	}
 
-
 	switch array.Right.(type) {
 	case string:
 		rightAsSQL = fmt.Sprintf("%v", array.Right)
 	default:
 		rightAsSQL = "?"
+
 		bindings = append(bindings, array.Right)
 	}
 
-
-	asSQL = leftAsSQL + " " + array.Operator + " " + array.Type + "(" + rightAsSQL + ")"
-	return asSQL, bindings
+	return fmt.Sprintf(
+		"%s %s %s(%s)",
+		leftAsSQL, array.Operator, array.Type, rightAsSQL,
+	), bindings
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
@@ -435,12 +430,13 @@ func (in InCondition) Parse() (asSQL string, bindings []interface{}) {
 	if in.NotIn {
 		asSQL += " NOT"
 	}
+
 	asSQL += " IN ("
 
-	var placeholders []string
+	placeholders := make([]string, len(in.Right))
+	for i, val := range in.Right {
+		placeholders[i] = "?"
 
-	for _, val := range in.Right {
-		placeholders = append(placeholders, "?")
 		bindings = append(bindings, val)
 	}
 
@@ -452,17 +448,21 @@ func (in InCondition) Parse() (asSQL string, bindings []interface{}) {
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (andOr AndOrCondition) Parse() (asSQL string, bindings []interface{}) {
-	var sqls []string
-	for _, cond := range andOr.Conditions {
+	sqls := make([]string, len(andOr.Conditions))
+
+	for i, cond := range andOr.Conditions {
 		innerSQL, innerBindings := cond.Parse()
-		sqls = append(sqls, innerSQL)
+		sqls[i] = innerSQL
+
 		bindings = append(bindings, innerBindings...)
 	}
+
 	op := " AND "
 	if andOr.Or {
 		op = " OR "
 	}
-	return "(" + strings.Join(sqls, op) + ")", bindings
+
+	return fmt.Sprintf("(%s)", strings.Join(sqls, op)), bindings
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
@@ -471,7 +471,7 @@ func (pre PreCondition) Parse() (asSQL string, bindings []interface{}) {
 	innerSQL, innerBindings := pre.Condition.Parse()
 	bindings = append(bindings, innerBindings...)
 
-	return pre.Pre +" ("  +innerSQL + ")", bindings
+	return fmt.Sprintf("%s(%s)", pre.Pre, innerSQL), bindings
 }
 
 // Parse implements the WhereCondition interface, generating SQL from
@@ -493,4 +493,18 @@ func parseConditions(conds []WhereCondition) (asSQL string, bindings []interface
 	}
 
 	return asSQL, bindings
+}
+
+func sortKeys(m map[string]interface{}) []string {
+	var i int
+
+	keys := make([]string, len(m))
+	for key := range m {
+		keys[i] = key
+		i++
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }

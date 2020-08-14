@@ -64,11 +64,12 @@ func (stmt *WithStmt) Then(mainStmt SQLStmt) *WithStmt {
 func (stmt *WithStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"WITH"}
 
-	var auxStmts []string
-	for _, aux := range stmt.AuxStmts {
+	auxStmts := make([]string, len(stmt.AuxStmts))
+
+	for i, aux := range stmt.AuxStmts {
 		auxSQL, auxBindings := aux.Stmt.ToSQL(false)
 		bindings = append(bindings, auxBindings...)
-		auxStmts = append(auxStmts, aux.As+" AS ("+auxSQL+")")
+		auxStmts[i] = aux.As + " AS (" + auxSQL + ")"
 	}
 
 	clauses = append(clauses, strings.Join(auxStmts, ", "))

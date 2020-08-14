@@ -43,7 +43,7 @@ func TestInsert(t *testing.T) {
 			},
 
 			test{
-				"insert with an on conflict do update",
+				"insert with on conflict do update",
 				dbz.InsertInto("table").Columns("name").Values("My Name").
 					OnConflict(
 						OnConflict("name", "something_else").
@@ -53,12 +53,12 @@ func TestInsert(t *testing.T) {
 								"name":    "My Name Again",
 								"address": "Some Address",
 							})),
-				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name, something_else) DO UPDATE SET update_date = ?, name = ?, address = ?",
-				[]interface{}{"My Name", 55151515, "My Name Again", "Some Address"},
+				"INSERT INTO table (name) VALUES (?) ON CONFLICT (name, something_else) DO UPDATE SET update_date = ?, address = ?, name = ?",
+				[]interface{}{"My Name", 55151515, "Some Address", "My Name Again"},
 			},
 
 			test{
-				"insert with an on conflict do update conditional set",
+				"insert with on conflict do update conditional set",
 				dbz.InsertInto("table").Columns("name").Values("My Name").
 					OnConflict(
 						OnConflict("name").

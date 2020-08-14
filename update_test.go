@@ -45,8 +45,8 @@ func TestUpdate(t *testing.T) {
 			test{
 				"update with conditional set (true)",
 				dbz.Update("table").Set("something", 3).SetIf("other", 2, 3 > 1),
-				"UPDATE table SET something = ?, other = ?",
-				[]interface{}{3, 2},
+				"UPDATE table SET other = ?, something = ?",
+				[]interface{}{2, 3},
 			},
 
 			test{

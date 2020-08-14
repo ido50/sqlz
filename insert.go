@@ -11,7 +11,7 @@ import (
 
 // InsertStmt represents an INSERT statement
 type InsertStmt struct {
-	*Statment
+	*Statement
 	InsCols         []string
 	InsVals         []interface{}
 	InsMultipleVals [][]interface{}
@@ -27,9 +27,9 @@ type InsertStmt struct {
 // provided table
 func (db *DB) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
-		Table:    table,
-		execer:   db.DB,
-		Statment: &Statment{db.ErrHandlers},
+		Table:     table,
+		execer:    db.DB,
+		Statement: &Statement{db.ErrHandlers},
 	}
 }
 
@@ -37,9 +37,9 @@ func (db *DB) InsertInto(table string) *InsertStmt {
 // provided table
 func (tx *Tx) InsertInto(table string) *InsertStmt {
 	return &InsertStmt{
-		Table:    table,
-		execer:   tx.Tx,
-		Statment: &Statment{tx.ErrHandlers},
+		Table:     table,
+		execer:    tx.Tx,
+		Statement: &Statement{tx.ErrHandlers},
 	}
 }
 
@@ -60,18 +60,17 @@ func (stmt *InsertStmt) Values(vals ...interface{}) *InsertStmt {
 
 // ValueMap receives a map of columns and values to insert
 func (stmt *InsertStmt) ValueMap(vals map[string]interface{}) *InsertStmt {
-	for col, val := range vals {
+	for _, col := range sortKeys(vals) {
 		stmt.InsCols = append(stmt.InsCols, col)
-		stmt.InsVals = append(stmt.InsVals, val)
+		stmt.InsVals = append(stmt.InsVals, vals[col])
 	}
+
 	return stmt
 }
 
 // ValueMultiple receives an array of interfaces in order to insert multiple records using the same insert statement
 func (stmt *InsertStmt) ValueMultiple(vals [][]interface{}) *InsertStmt {
-	for _, val := range vals {
-		stmt.InsMultipleVals = append(stmt.InsMultipleVals, val)
-	}
+	stmt.InsMultipleVals = append(stmt.InsMultipleVals, vals...)
 	return stmt
 }
 
@@ -147,16 +146,18 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		clauses = append(clauses, "("+strings.Join(stmt.InsCols, ", ")+")")
 	}
 
-	if stmt.SelectStmt != nil {
+	switch {
+	case stmt.SelectStmt != nil:
 		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
 		clauses = append(clauses, selectSQL)
 		bindings = append(bindings, selectBindings...)
-	} else if len(stmt.InsVals) > 0 {
+	case len(stmt.InsVals) > 0:
 		placeholders, bindingsToAdd := parseInsertValues(stmt.InsVals)
 		bindings = append(bindings, bindingsToAdd...)
 		clauses = append(clauses, "VALUES ("+strings.Join(placeholders, ", ")+")")
-	} else if len(stmt.InsMultipleVals) > 0 {
+	case len(stmt.InsMultipleVals) > 0:
 		var multipleValues []string
+
 		for _, insVals := range stmt.InsMultipleVals {
 			placeholders, bindingsToAdd := parseInsertValues(insVals)
 			bindings = append(bindings, bindingsToAdd...)
@@ -194,7 +195,8 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 func (stmt *InsertStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	res, err = stmt.execer.Exec(asSQL, bindings...)
-	stmt.Statment.HandlerError(err)
+	stmt.Statement.HandlerError(err)
+
 	return res, err
 }
 
@@ -202,8 +204,10 @@ func (stmt *InsertStmt) Exec() (res sql.Result, err error) {
 // sql.Result struct and an error if the query failed.
 func (stmt *InsertStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
-	stmt.Statment.HandlerError(err)
+	stmt.Statement.HandlerError(err)
+
 	return res, err
 }
 
@@ -214,6 +218,7 @@ func (stmt *InsertStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 // are returned)
 func (stmt *InsertStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	return sqlx.Get(stmt.execer, into, asSQL, bindings...)
 }
 
@@ -224,6 +229,7 @@ func (stmt *InsertStmt) GetRow(into interface{}) error {
 // are returned)
 func (stmt *InsertStmt) GetRowContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	return sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
 }
 
@@ -292,9 +298,9 @@ func (conflict *ConflictClause) SetMap(vals map[string]interface{}) *ConflictCla
 		return conflict
 	}
 
-	for col, val := range vals {
+	for _, col := range sortKeys(vals) {
 		conflict.SetCols = append(conflict.SetCols, col)
-		conflict.SetVals = append(conflict.SetVals, val)
+		conflict.SetVals = append(conflict.SetVals, vals[col])
 	}
 
 	return conflict
@@ -331,10 +337,12 @@ func (conflict *ConflictClause) ToSQL() (asSQL string, bindings []interface{}) {
 		words = append(words, "DO UPDATE SET")
 
 		var updates []string
+
 		for i, col := range conflict.SetCols {
 			val := conflict.SetVals[i]
 			if fn, isFn := val.(UpdateFunction); isFn {
 				var args []string
+
 				for _, arg := range fn.Arguments {
 					if indirect, isIndirect := arg.(IndirectValue); isIndirect {
 						args = append(args, indirect.Reference)
@@ -344,6 +352,7 @@ func (conflict *ConflictClause) ToSQL() (asSQL string, bindings []interface{}) {
 						bindings = append(bindings, arg)
 					}
 				}
+
 				updates = append(updates, col+" = "+fn.Name+"("+strings.Join(args, ", ")+")")
 			} else if indirect, isIndirect := val.(IndirectValue); isIndirect {
 				updates = append(updates, col+" = "+indirect.Reference)
@@ -374,7 +383,7 @@ func parseInsertValues(insVals []interface{}) (placeholders []string, bindingsTo
 			placeholders = append(placeholders, "?")
 			bindingsToAdd = append(bindingsToAdd, val)
 		}
-
 	}
+
 	return placeholders, bindingsToAdd
 }

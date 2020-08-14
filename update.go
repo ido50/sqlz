@@ -3,6 +3,7 @@ package sqlz
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -10,13 +11,13 @@ import (
 
 // UpdateStmt represents an UPDATE statement
 type UpdateStmt struct {
-	*Statment
-	Table      string
-	Updates    map[string]interface{}
-	Conditions []WhereCondition
-	Return     []string
-	execer     Ext
-	SelectStmt *SelectStmt
+	*Statement
+	Table           string
+	Updates         map[string]interface{}
+	Conditions      []WhereCondition
+	Return          []string
+	execer          Ext
+	SelectStmt      *SelectStmt
 	SelectStmtAlias string
 }
 
@@ -24,10 +25,10 @@ type UpdateStmt struct {
 // the specified table
 func (db *DB) Update(table string) *UpdateStmt {
 	return &UpdateStmt{
-		Table:   table,
-		Updates: make(map[string]interface{}),
-		execer:  db.DB,
-		Statment: &Statment{db.ErrHandlers},
+		Table:     table,
+		Updates:   make(map[string]interface{}),
+		execer:    db.DB,
+		Statement: &Statement{db.ErrHandlers},
 	}
 }
 
@@ -35,13 +36,12 @@ func (db *DB) Update(table string) *UpdateStmt {
 // the specified table
 func (tx *Tx) Update(table string) *UpdateStmt {
 	return &UpdateStmt{
-		Table:   table,
-		Updates: make(map[string]interface{}),
-		execer:  tx.Tx,
-		Statment: &Statment{tx.ErrHandlers},
+		Table:     table,
+		Updates:   make(map[string]interface{}),
+		execer:    tx.Tx,
+		Statement: &Statement{tx.ErrHandlers},
 	}
 }
-
 
 // Set receives the name of a column and a new value. Multiple calls to Set
 // can be chained together to modify multiple columns. Set can also be chained
@@ -56,6 +56,7 @@ func (stmt *UpdateStmt) SetMap(updates map[string]interface{}) *UpdateStmt {
 	for col, value := range updates {
 		stmt.Updates[col] = value
 	}
+
 	return stmt
 }
 
@@ -67,6 +68,7 @@ func (stmt *UpdateStmt) SetIf(col string, value interface{}, b bool) *UpdateStmt
 	if b {
 		stmt.Updates[col] = value
 	}
+
 	return stmt
 }
 
@@ -86,9 +88,10 @@ func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 	return stmt
 }
 
-func (stmt *UpdateStmt) FromSelect(selStmt *SelectStmt,alias string) *UpdateStmt {
+func (stmt *UpdateStmt) FromSelect(selStmt *SelectStmt, alias string) *UpdateStmt {
 	stmt.SelectStmt = selStmt
 	stmt.SelectStmtAlias = alias
+
 	return stmt
 }
 
@@ -96,13 +99,16 @@ func (stmt *UpdateStmt) FromSelect(selStmt *SelectStmt,alias string) *UpdateStmt
 // bindings. It is used internally by Exec, GetRow and GetAll, but is
 // exported if you wish to use it directly.
 func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
-	var clauses = []string{"UPDATE " + stmt.Table}
+	var clauses = []string{fmt.Sprintf("UPDATE %s", stmt.Table)}
 
 	var updates []string
 
-	for col, val := range stmt.Updates {
+	// sort updates by column for reproducibility
+	for _, col := range sortKeys(stmt.Updates) {
+		val := stmt.Updates[col]
 		if fn, isFn := val.(UpdateFunction); isFn {
 			var args []string
+
 			for _, arg := range fn.Arguments {
 				if indirect, isIndirect := arg.(IndirectValue); isIndirect {
 					args = append(args, indirect.Reference)
@@ -112,6 +118,7 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 					bindings = append(bindings, arg)
 				}
 			}
+
 			updates = append(updates, col+" = "+fn.Name+"("+strings.Join(args, ", ")+")")
 		} else if indirect, isIndirect := val.(IndirectValue); isIndirect {
 			updates = append(updates, col+" = "+indirect.Reference)
@@ -124,10 +131,11 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 
 	clauses = append(clauses, "SET "+strings.Join(updates, ", "))
 
-	if stmt.SelectStmt != nil && stmt.SelectStmtAlias != ""{
+	if stmt.SelectStmt != nil && stmt.SelectStmtAlias != "" {
 		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
-		selectSQL= "("+selectSQL+") AS "+ stmt.SelectStmtAlias+" "
-		clauses = append (clauses,"FROM ")
+		selectSQL = "(" + selectSQL + ") AS " + stmt.SelectStmtAlias + " "
+
+		clauses = append(clauses, "FROM ")
 		clauses = append(clauses, selectSQL)
 		bindings = append(bindings, selectBindings...)
 	}
@@ -135,7 +143,7 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	if len(stmt.Conditions) > 0 {
 		whereClause, whereBindings := parseConditions(stmt.Conditions)
 		bindings = append(bindings, whereBindings...)
-		clauses = append(clauses, "WHERE "+whereClause)
+		clauses = append(clauses, fmt.Sprintf("WHERE %s", whereClause))
 	}
 
 	if len(stmt.Return) > 0 {
@@ -159,8 +167,10 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // sql.Result struct and an error if the query failed.
 func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	res, err = stmt.execer.Exec(asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return res, err
 }
 
@@ -168,10 +178,11 @@ func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 // sql.Result struct and an error if the query failed.
 func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
 	stmt.HandlerError(err)
-	return res, err
 
+	return res, err
 }
 
 // GetRow executes an UPDATE statement with a RETURNING clause
@@ -181,8 +192,10 @@ func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 // are returned)
 func (stmt *UpdateStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Get(stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -193,8 +206,10 @@ func (stmt *UpdateStmt) GetRow(into interface{}) error {
 // are returned)
 func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -203,8 +218,10 @@ func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) err
 // the provided slice variable
 func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Select(stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -213,8 +230,10 @@ func (stmt *UpdateStmt) GetAll(into interface{}) error {
 // the provided slice variable
 func (stmt *UpdateStmt) GetAllContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -253,4 +272,3 @@ func ArrayRemove(name string, value interface{}) UpdateFunction {
 		Arguments: []interface{}{Indirect(name), value},
 	}
 }
-

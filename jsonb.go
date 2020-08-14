@@ -14,7 +14,8 @@ type JSONBBuilder struct {
 }
 
 func BuildJSONBObject(in map[string]interface{}) (out JSONBBuilder) {
-	for key, val := range in {
+	for _, key := range sortKeys(in) {
+		val := in[key]
 		out.Bindings = append(out.Bindings, key, val)
 	}
 
@@ -24,6 +25,7 @@ func BuildJSONBObject(in map[string]interface{}) (out JSONBBuilder) {
 func BuildJSONBArray(in ...interface{}) (out JSONBBuilder) {
 	out.Array = true
 	out.Bindings = append(out.Bindings, in...)
+
 	return out
 }
 

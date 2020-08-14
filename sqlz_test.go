@@ -20,19 +20,21 @@ func runTests(t *testing.T, source func(dbz *DB) []test) {
 	}
 
 	for _, tst := range source(New(db, "sqlmock")) {
-		resultingSQL, resultingBindings := tst.stmt.ToSQL(true)
-		if resultingSQL != tst.expectedSQL {
-			t.Errorf("Failed %s: expected %s, got %s", tst.name, tst.expectedSQL, resultingSQL)
-		}
+		t.Run(tst.name, func(t *testing.T) {
+			resultingSQL, resultingBindings := tst.stmt.ToSQL(true)
+			if resultingSQL != tst.expectedSQL {
+				t.Errorf("Failed %s: expected %s, got %s", tst.name, tst.expectedSQL, resultingSQL)
+			}
 
-		if len(tst.expectedBindings) != len(resultingBindings) {
-			t.Errorf("Failed %s: expected %d bindings, got %d", tst.name, len(tst.expectedBindings), len(resultingBindings))
-		} else {
-			for i := range tst.expectedBindings {
-				if tst.expectedBindings[i] != resultingBindings[i] {
-					t.Errorf("Failed %s: expected binding %d to be %v, got %v", tst.name, i+1, tst.expectedBindings[i], resultingBindings[i])
+			if len(tst.expectedBindings) != len(resultingBindings) {
+				t.Errorf("Failed %s: expected %d bindings, got %d", tst.name, len(tst.expectedBindings), len(resultingBindings))
+			} else {
+				for i := range tst.expectedBindings {
+					if tst.expectedBindings[i] != resultingBindings[i] {
+						t.Errorf("Failed %s: expected binding %d to be %v, got %v", tst.name, i+1, tst.expectedBindings[i], resultingBindings[i])
+					}
 				}
 			}
-		}
+		})
 	}
 }

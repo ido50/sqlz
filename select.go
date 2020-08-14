@@ -10,22 +10,7 @@ import (
 
 // JoinType is an enumerated type representing the
 // type of a JOIN clause (INNER, LEFT, RIGHT or FULL)
-type JoinType int
-
-// String returns the string representation of the
-// join type (e.g. "FULL JOIN")
-func (j JoinType) String() string {
-	str := []string{"INNER", "LEFT", "RIGHT", "FULL"}[int(j%4)] + " JOIN"
-	if j.IsLateral() {
-		str += " LATERAL"
-	}
-
-	return str
-}
-
-func (j JoinType) IsLateral() bool {
-	return int(InnerLateralJoin) <= int(j) && int(j) <= int(RightLateralJoin)
-}
+type JoinType string
 
 // InnerJoin represents an inner join
 // LeftJoin represents a left join
@@ -35,23 +20,37 @@ func (j JoinType) IsLateral() bool {
 // LeftLateralJoin represents a left lateral join
 // RightLateralJoin represents a right lateral join
 const (
-	InnerJoin JoinType = iota
-	LeftJoin
-	RightJoin
-	FullJoin
-	InnerLateralJoin
-	LeftLateralJoin
-	RightLateralJoin
+	InnerJoin        JoinType = "INNER JOIN"
+	LeftJoin         JoinType = "LEFT JOIN"
+	RightJoin        JoinType = "RIGHT JOIN"
+	FullJoin                  = "FULL JOIN"
+	InnerLateralJoin          = "INNER JOIN LATERAL"
+	LeftLateralJoin           = "LEFT JOIN LATERAL"
+	RightLateralJoin          = "RIGHT JOIN LATERAL"
 )
+
+// String returns the string representation of the
+// join type (e.g. "FULL JOIN")
+func (j JoinType) String() string {
+	return string(j)
+}
+
+func (j JoinType) IsLateral() bool {
+	return j == InnerLateralJoin || j == LeftLateralJoin || j == RightLateralJoin
+}
 
 // SelectStmt represents a SELECT statement
 type SelectStmt struct {
-	*Statment
+	Table           string
+	LimitTo         int64
+	OffsetFrom      int64
+	OffsetRows      int64
 	IsDistinct      bool
 	IsUnionAll      bool
+	orderWithNulls  orderWithNulls
+	queryer         Queryer
 	DistinctColumns []string
 	Columns         []string
-	Table           string
 	Joins           []JoinClause
 	Conditions      []WhereCondition
 	Ordering        []SQLStmt
@@ -59,11 +58,7 @@ type SelectStmt struct {
 	GroupConditions []WhereCondition
 	Unions          []*SelectStmt
 	Locks           []*LockClause
-	LimitTo         int64
-	OffsetFrom      int64
-	OffsetRows      int64
-	orderWithNulls  orderWithNulls
-	queryer         Queryer
+	*Statement
 }
 
 // JoinClause represents a JOIN clause in a
@@ -78,8 +73,8 @@ type JoinClause struct {
 // LockClause represents a row or table level locking for a SELECT statement
 type LockClause struct {
 	Strength LockStrength
-	Tables   []string
 	Wait     LockWait
+	Tables   []string
 }
 
 func (lock *LockClause) NoWait() *LockClause {
@@ -137,6 +132,7 @@ func (o OrderColumn) ToSQL(_ bool) (string, []interface{}) {
 	} else {
 		str += " ASC"
 	}
+
 	return str, nil
 }
 
@@ -158,9 +154,9 @@ func Desc(col string) OrderColumn {
 // Select("one", "two t", "MAX(three) maxThree")
 func (db *DB) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
-		Columns:  append([]string{}, cols...),
-		queryer:  db.DB,
-		Statment: &Statment{db.ErrHandlers},
+		Columns:   append([]string{}, cols...),
+		queryer:   db.DB,
+		Statement: &Statement{db.ErrHandlers},
 	}
 }
 
@@ -170,9 +166,9 @@ func (db *DB) Select(cols ...string) *SelectStmt {
 // Select("one", "two t", "MAX(three) maxThree")
 func (tx *Tx) Select(cols ...string) *SelectStmt {
 	return &SelectStmt{
-		Columns:  append([]string{}, cols...),
-		queryer:  tx.Tx,
-		Statment: &Statment{tx.ErrHandlers},
+		Columns:   append([]string{}, cols...),
+		queryer:   tx.Tx,
+		Statement: &Statement{tx.ErrHandlers},
 	}
 }
 
@@ -181,6 +177,7 @@ func (tx *Tx) Select(cols ...string) *SelectStmt {
 func (stmt *SelectStmt) Distinct(cols ...string) *SelectStmt {
 	stmt.DistinctColumns = append([]string{}, cols...)
 	stmt.IsDistinct = true
+
 	return stmt
 }
 
@@ -195,13 +192,19 @@ func (stmt *SelectStmt) From(table string) *SelectStmt {
 // using the provided conditions. Since conditions in a
 // JOIN clause usually compare two columns, use sqlz.Indirect
 // in your conditions.
-func (stmt *SelectStmt) Join(joinType JoinType, table string, resultSet *SelectStmt, conds ...WhereCondition) *SelectStmt {
+func (stmt *SelectStmt) Join(
+	joinType JoinType,
+	table string,
+	resultSet *SelectStmt,
+	conds ...WhereCondition,
+) *SelectStmt {
 	stmt.Joins = append(stmt.Joins, JoinClause{
 		Type:       joinType,
 		Table:      table,
 		ResultSet:  resultSet,
 		Conditions: append([]WhereCondition{}, conds...),
 	})
+
 	return stmt
 }
 
@@ -324,6 +327,7 @@ func (stmt *SelectStmt) Offset(start int64, rows ...int64) *SelectStmt {
 	if len(rows) > 0 {
 		stmt.OffsetRows = rows[0]
 	}
+
 	return stmt
 }
 
@@ -355,6 +359,7 @@ func ForKeyShare() *LockClause {
 // ToSQL generates the SELECT statement's SQL and returns a list of
 // bindings. It is used internally by GetRow and GetAll, but is
 // exported if you wish to use it directly.
+// nolint: gocognit, gocyclo
 func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
 	var clauses = []string{"SELECT"}
 
@@ -372,7 +377,7 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	}
 
 	if len(stmt.Table) > 0 {
-		clauses = append(clauses, "FROM "+stmt.Table)
+		clauses = append(clauses, fmt.Sprintf("FROM %s", stmt.Table))
 	}
 
 	for _, join := range stmt.Joins {
@@ -395,26 +400,28 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	if len(stmt.Conditions) > 0 {
 		whereClause, whereBindings := parseConditions(stmt.Conditions)
 		bindings = append(bindings, whereBindings...)
-		clauses = append(clauses, "WHERE "+whereClause)
+		clauses = append(clauses, fmt.Sprintf("WHERE %s", whereClause))
 	}
 
 	if len(stmt.Grouping) > 0 {
-		clauses = append(clauses, "GROUP BY "+strings.Join(stmt.Grouping, ", "))
+		clauses = append(clauses, fmt.Sprintf("GROUP BY %s", strings.Join(stmt.Grouping, ", ")))
 	}
 
 	if len(stmt.GroupConditions) > 0 {
 		groupByClause, groupBindings := parseConditions(stmt.GroupConditions)
 		bindings = append(bindings, groupBindings...)
-		clauses = append(clauses, "HAVING "+groupByClause)
+		clauses = append(clauses, fmt.Sprintf("HAVING %s", groupByClause))
 	}
 
 	if len(stmt.Ordering) > 0 {
 		var ordering []string
+
 		for _, order := range stmt.Ordering {
 			o, _ := order.ToSQL(false)
 			ordering = append(ordering, o)
 		}
-		clauses = append(clauses, "ORDER BY "+strings.Join(ordering, ", "))
+
+		clauses = append(clauses, fmt.Sprintf("ORDER BY %s", strings.Join(ordering, ", ")))
 
 		if stmt.orderWithNulls.Enabled {
 			if stmt.orderWithNulls.First {
@@ -434,13 +441,13 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		if stmt.OffsetRows > 0 {
 			offset += fmt.Sprintf(" %d", stmt.OffsetRows)
 		}
+
 		clauses = append(clauses, "OFFSET "+offset)
 	}
 
 	for _, lock := range stmt.Locks {
-		var lockClause []string
-
 		var lockStrength string
+
 		switch lock.Strength {
 		case LockForUpdate:
 			lockStrength = "FOR UPDATE"
@@ -453,16 +460,16 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		default:
 			continue
 		}
-		lockClause = append(lockClause, lockStrength)
+
+		lockClause := []string{lockStrength}
 
 		if len(lock.Tables) > 0 {
 			lockClause = append(lockClause, "OF "+strings.Join(lock.Tables, ", "))
 		}
 
-		switch lock.Wait {
-		case LockNoWait:
+		if lock.Wait == LockNoWait {
 			lockClause = append(lockClause, "NOWAIT")
-		case LockSkipLocked:
+		} else if lock.Wait == LockSkipLocked {
 			lockClause = append(lockClause, "SKIP LOCKED")
 		}
 
@@ -501,8 +508,10 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // multiple columns were selected).
 func (stmt *SelectStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Get(stmt.queryer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -512,8 +521,10 @@ func (stmt *SelectStmt) GetRow(into interface{}) error {
 // multiple columns were selected).
 func (stmt *SelectStmt) GetRowContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.GetContext(ctx, stmt.queryer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -521,8 +532,10 @@ func (stmt *SelectStmt) GetRowContext(ctx context.Context, into interface{}) err
 // results into the provided slice variable.
 func (stmt *SelectStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Select(stmt.queryer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -530,8 +543,10 @@ func (stmt *SelectStmt) GetAll(into interface{}) error {
 // results into the provided slice variable.
 func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.SelectContext(ctx, stmt.queryer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -540,8 +555,7 @@ func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) err
 // total number of matching results. This is useful when
 // paginating results.
 func (stmt *SelectStmt) GetCount() (count int64, err error) {
-	var countStmt SelectStmt
-	countStmt = *stmt
+	countStmt := *stmt
 	countStmt.Columns = []string{"COUNT(*)"}
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
@@ -549,6 +563,7 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 	countStmt.Ordering = []SQLStmt{}
 
 	err = countStmt.GetRow(&count)
+
 	return count, err
 }
 
@@ -557,8 +572,7 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 // total number of matching results. This is useful when
 // paginating results.
 func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err error) {
-	var countStmt SelectStmt
-	countStmt = *stmt
+	countStmt := *stmt
 	countStmt.Columns = []string{"COUNT(*)"}
 	countStmt.LimitTo = 0
 	countStmt.OffsetFrom = 0
@@ -566,6 +580,7 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 	countStmt.Ordering = []SQLStmt{}
 
 	err = countStmt.GetRowContext(ctx, &count)
+
 	return count, err
 }
 
@@ -573,10 +588,10 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 // of maps from string to empty interfaces. This is useful for intermediary
 // query where creating a struct type would be redundant
 func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error) {
-	defer func() {
-		stmt.HandlerError(err)
-	}()
+	defer stmt.HandlerError(err)
+
 	asSQL, bindings := stmt.ToSQL(true)
+
 	rows, err := stmt.queryer.Queryx(asSQL, bindings...)
 	if err != nil {
 		return maps, err
@@ -586,6 +601,7 @@ func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error
 
 	for rows.Next() {
 		results := make(map[string]interface{})
+
 		err = rows.MapScan(results)
 		if err != nil {
 			return maps, err
@@ -608,8 +624,10 @@ func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error
 func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	results = make(map[string]interface{})
+
 	err = stmt.queryer.QueryRowx(asSQL, bindings...).MapScan(results)
 	stmt.HandlerError(err)
+
 	return results, err
 }
 
@@ -618,8 +636,10 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 // with Close().
 func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	rows, err = stmt.queryer.Queryx(asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return rows, err
 }
 
@@ -628,8 +648,10 @@ func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 // with Close().
 func (stmt *SelectStmt) GetAllAsRowsContext(ctx context.Context) (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	rows, err = stmt.queryer.QueryxContext(ctx, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return rows, err
 }
 
@@ -643,5 +665,6 @@ func (stmt *SelectStmt) Union(statements ...*SelectStmt) *SelectStmt {
 func (stmt *SelectStmt) UnionAll(statements ...*SelectStmt) *SelectStmt {
 	stmt.IsUnionAll = true
 	stmt.Union(statements...)
+
 	return stmt
 }

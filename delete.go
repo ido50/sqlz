@@ -10,7 +10,7 @@ import (
 
 // DeleteStmt represents a DELETE statement
 type DeleteStmt struct {
-	*Statment
+	*Statement
 	Table       string
 	Conditions  []WhereCondition
 	UsingTables []string
@@ -22,9 +22,9 @@ type DeleteStmt struct {
 // provided table
 func (db *DB) DeleteFrom(table string) *DeleteStmt {
 	return &DeleteStmt{
-		Table:  table,
-		execer: db.DB,
-		Statment: &Statment{db.ErrHandlers},
+		Table:     table,
+		execer:    db.DB,
+		Statement: &Statement{db.ErrHandlers},
 	}
 }
 
@@ -32,9 +32,9 @@ func (db *DB) DeleteFrom(table string) *DeleteStmt {
 // provided table
 func (tx *Tx) DeleteFrom(table string) *DeleteStmt {
 	return &DeleteStmt{
-		Table:  table,
-		execer: tx.Tx,
-		Statment: &Statment{tx.ErrHandlers},
+		Table:     table,
+		execer:    tx.Tx,
+		Statement: &Statement{tx.ErrHandlers},
 	}
 }
 
@@ -97,17 +97,24 @@ func (stmt *DeleteStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 // sql.Result struct and an error if the query failed.
 func (stmt *DeleteStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	res, err = stmt.execer.Exec(asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return res, err
 }
 
 // ExecContext executes the DELETE statement, returning the standard
 // sql.Result struct and an error if the query failed.
-func (stmt *DeleteStmt) ExecContext(ctx context.Context) (res sql.Result, err error) {
+func (stmt *DeleteStmt) ExecContext(ctx context.Context) (
+	res sql.Result,
+	err error,
+) {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return res, err
 }
 
@@ -118,8 +125,10 @@ func (stmt *DeleteStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 // are returned)
 func (stmt *DeleteStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Get(stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -128,10 +137,15 @@ func (stmt *DeleteStmt) GetRow(into interface{}) error {
 // the provided variable (which may be a simple variable if
 // only one column is returned, or a struct if multiple columns
 // are returned)
-func (stmt *DeleteStmt) GetRowContext(ctx context.Context, into interface{}) error {
+func (stmt *DeleteStmt) GetRowContext(
+	ctx context.Context,
+	into interface{},
+) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -140,8 +154,10 @@ func (stmt *DeleteStmt) GetRowContext(ctx context.Context, into interface{}) err
 // the provided slice variable
 func (stmt *DeleteStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.Select(stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
 
@@ -150,7 +166,9 @@ func (stmt *DeleteStmt) GetAll(into interface{}) error {
 // the provided slice variable
 func (stmt *DeleteStmt) GetAllContext(ctx context.Context, into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
+
 	err := sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
 	stmt.HandlerError(err)
+
 	return err
 }
