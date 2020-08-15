@@ -88,6 +88,8 @@ func (stmt *UpdateStmt) Returning(cols ...string) *UpdateStmt {
 	return stmt
 }
 
+// FromSelect allows creating update statements that takes values from the
+// result of a select statement.
 func (stmt *UpdateStmt) FromSelect(selStmt *SelectStmt, alias string) *UpdateStmt {
 	stmt.SelectStmt = selStmt
 	stmt.SelectStmtAlias = alias
@@ -169,7 +171,7 @@ func (stmt *UpdateStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	res, err = stmt.execer.Exec(asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return res, err
 }
@@ -180,7 +182,7 @@ func (stmt *UpdateStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 	asSQL, bindings := stmt.ToSQL(true)
 
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return res, err
 }
@@ -194,7 +196,7 @@ func (stmt *UpdateStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Get(stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -208,7 +210,7 @@ func (stmt *UpdateStmt) GetRowContext(ctx context.Context, into interface{}) err
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -220,7 +222,7 @@ func (stmt *UpdateStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Select(stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -232,7 +234,7 @@ func (stmt *UpdateStmt) GetAllContext(ctx context.Context, into interface{}) err
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }

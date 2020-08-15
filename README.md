@@ -1,9 +1,10 @@
 <h2 align="center">sqlz</h2>
-<p align="center">sqlz is an SQL query builder for Go.</p>
+<p align="center">flexible SQL query builder for Go.</p>
 <p align="center">
 	<a href="https://godoc.org/github.com/ido50/sqlz"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 	<a href="https://goreportcard.com/report/ido50/sqlz"><img src="https://goreportcard.com/badge/github.com/ido50/sqlz"></a>
+    <a href="https://github.com/ido50/sqlz/actions"><img src="https://github.com/ido50/sqlz/workflows/build/badge.svg"></a>
 </p>
 
 ---

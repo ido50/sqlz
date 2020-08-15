@@ -74,8 +74,7 @@ func (stmt *InsertStmt) ValueMultiple(vals [][]interface{}) *InsertStmt {
 	return stmt
 }
 
-// Select sets a SELECT statements that will supply the rows
-// to be inserted.
+// FromSelect sets a SELECT statements that will supply the rows to be inserted.
 func (stmt *InsertStmt) FromSelect(selStmt *SelectStmt) *InsertStmt {
 	stmt.SelectStmt = selStmt
 	return stmt
@@ -195,7 +194,7 @@ func (stmt *InsertStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 func (stmt *InsertStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 	res, err = stmt.execer.Exec(asSQL, bindings...)
-	stmt.Statement.HandlerError(err)
+	stmt.Statement.HandleError(err)
 
 	return res, err
 }
@@ -206,7 +205,7 @@ func (stmt *InsertStmt) ExecContext(ctx context.Context) (res sql.Result, err er
 	asSQL, bindings := stmt.ToSQL(true)
 
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
-	stmt.Statement.HandlerError(err)
+	stmt.Statement.HandleError(err)
 
 	return res, err
 }
@@ -253,8 +252,11 @@ func (stmt *InsertStmt) GetAllContext(ctx context.Context, into interface{}) err
 type ConflictAction string
 
 const (
+	// DoNothing represents a "DO NOTHING" conflict action
 	DoNothing ConflictAction = "nothing"
-	DoUpdate  ConflictAction = "update"
+
+	// DoUpdate represents a "DO UPDATE" conflict action
+	DoUpdate ConflictAction = "update"
 )
 
 // ConflictClause represents an ON CONFLICT clause in an INSERT statement

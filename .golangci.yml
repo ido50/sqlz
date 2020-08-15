@@ -5,6 +5,7 @@ linters:
     disable-all: true
     enable:
         - govet
+        - golint
         - errcheck
         - staticcheck
         - unused

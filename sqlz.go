@@ -168,6 +168,7 @@ func Indirect(value string, bindings ...interface{}) IndirectValue {
 	return IndirectValue{value, bindings}
 }
 
+// ToSQL returns the indirect value as SQL, together with its bindings.
 func (i IndirectValue) ToSQL(_ bool) (string, []interface{}) {
 	return i.Reference, i.Bindings
 }

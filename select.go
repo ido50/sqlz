@@ -35,6 +35,7 @@ func (j JoinType) String() string {
 	return string(j)
 }
 
+// IsLateral returns true if the join is a lateral join.
 func (j JoinType) IsLateral() bool {
 	return j == InnerLateralJoin || j == LeftLateralJoin || j == RightLateralJoin
 }
@@ -77,16 +78,19 @@ type LockClause struct {
 	Tables   []string
 }
 
+// NoWait sets the lock as a NO WAIT lock.
 func (lock *LockClause) NoWait() *LockClause {
 	lock.Wait = LockNoWait
 	return lock
 }
 
+// SkipLocked sets the lock as a SKIP LOCKED lock.
 func (lock *LockClause) SkipLocked() *LockClause {
 	lock.Wait = LockSkipLocked
 	return lock
 }
 
+// OfTables sets the tables for the lock.
 func (lock *LockClause) OfTables(tables ...string) *LockClause {
 	lock.Tables = append(lock.Tables, tables...)
 	return lock
@@ -96,9 +100,13 @@ func (lock *LockClause) OfTables(tables ...string) *LockClause {
 type LockStrength int8
 
 const (
+	// LockForUpdate represents a LOCK FOR UPDATE clause
 	LockForUpdate LockStrength = iota
+	// LockForNoKeyUpdate represents a LOCK FOR NO KEY UPDATE clause
 	LockForNoKeyUpdate
+	// LockForShare represents a LOCK FOR SHARE clause
 	LockForShare
+	// LockForKeyShare represents a LOCK FOR KEY SHARE clause
 	LockForKeyShare
 )
 
@@ -107,8 +115,11 @@ const (
 type LockWait int8
 
 const (
+	// LockDefault represents the default LockWait behavior
 	LockDefault LockWait = iota
+	// LockNoWait represents a no wait behavior
 	LockNoWait
+	// LockSkipLocked represents a skip locked behavior
 	LockSkipLocked
 )
 
@@ -256,14 +267,20 @@ func (stmt *SelectStmt) FullJoinRS(rs *SelectStmt, as string, conds ...WhereCond
 	return stmt.Join(FullJoin, as, rs, conds...)
 }
 
+// LeftLateralJoin is a wrapper of Join for creating a LEFT LATERAL JOIN on a
+// table with the provided conditions
 func (stmt *SelectStmt) LeftLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(LeftLateralJoin, as, rs, conds...)
 }
 
+// RightLateralJoin is a wrapper of Join for creating a RIGHT LATERAL JOIN on a
+// table with the provided conditions
 func (stmt *SelectStmt) RightLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(RightLateralJoin, as, rs, conds...)
 }
 
+// InnerLateralJoin is a wrapper of Join for creating a INNER LATERAL JOIN on a
+// table with the provided conditions
 func (stmt *SelectStmt) InnerLateralJoin(rs *SelectStmt, as string, conds ...WhereCondition) *SelectStmt {
 	return stmt.Join(InnerLateralJoin, as, rs, conds...)
 }
@@ -275,7 +292,7 @@ func (stmt *SelectStmt) Where(conditions ...WhereCondition) *SelectStmt {
 	return stmt
 }
 
-// OrderBy with null values first
+// WithNullsFirst modifies ORDER BY clauses to sort NULL values first.
 func (stmt *SelectStmt) WithNullsFirst() *SelectStmt {
 	stmt.orderWithNulls.Enabled = true
 	stmt.orderWithNulls.First = true
@@ -283,7 +300,7 @@ func (stmt *SelectStmt) WithNullsFirst() *SelectStmt {
 	return stmt
 }
 
-// OrderBy with null values last
+// WithNullsLast modifies ORDER BY clauses to sort NULL values last.
 func (stmt *SelectStmt) WithNullsLast() *SelectStmt {
 	stmt.orderWithNulls.Enabled = true
 	stmt.orderWithNulls.First = false
@@ -331,6 +348,7 @@ func (stmt *SelectStmt) Offset(start int64, rows ...int64) *SelectStmt {
 	return stmt
 }
 
+// Lock sets a LOCK clause on the SELECT statement.
 func (stmt *SelectStmt) Lock(lock *LockClause) *SelectStmt {
 	stmt.Locks = append(stmt.Locks, lock)
 	return stmt
@@ -510,7 +528,7 @@ func (stmt *SelectStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Get(stmt.queryer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -523,7 +541,7 @@ func (stmt *SelectStmt) GetRowContext(ctx context.Context, into interface{}) err
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.GetContext(ctx, stmt.queryer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -534,7 +552,7 @@ func (stmt *SelectStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Select(stmt.queryer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -545,7 +563,7 @@ func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) err
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.SelectContext(ctx, stmt.queryer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -588,7 +606,7 @@ func (stmt *SelectStmt) GetCountContext(ctx context.Context) (count int64, err e
 // of maps from string to empty interfaces. This is useful for intermediary
 // query where creating a struct type would be redundant
 func (stmt *SelectStmt) GetAllAsMaps() (maps []map[string]interface{}, err error) {
-	defer stmt.HandlerError(err)
+	defer stmt.HandleError(err)
 
 	asSQL, bindings := stmt.ToSQL(true)
 
@@ -626,7 +644,7 @@ func (stmt *SelectStmt) GetRowAsMap() (results map[string]interface{}, err error
 	results = make(map[string]interface{})
 
 	err = stmt.queryer.QueryRowx(asSQL, bindings...).MapScan(results)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return results, err
 }
@@ -638,7 +656,7 @@ func (stmt *SelectStmt) GetAllAsRows() (rows *sqlx.Rows, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	rows, err = stmt.queryer.Queryx(asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return rows, err
 }
@@ -650,18 +668,18 @@ func (stmt *SelectStmt) GetAllAsRowsContext(ctx context.Context) (rows *sqlx.Row
 	asSQL, bindings := stmt.ToSQL(true)
 
 	rows, err = stmt.queryer.QueryxContext(ctx, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return rows, err
 }
 
-// Union adds the 'UNION' command between two SELECT statements or more
+// Union adds the 'UNION' command between two or more SELECT statements.
 func (stmt *SelectStmt) Union(statements ...*SelectStmt) *SelectStmt {
 	stmt.Unions = append(stmt.Unions, statements...)
 	return stmt
 }
 
-// Union adds the 'UNION ALL' command between two SELECT statements or more
+// UnionAll adds the 'UNION ALL' command between two or more SELECT statements.
 func (stmt *SelectStmt) UnionAll(statements ...*SelectStmt) *SelectStmt {
 	stmt.IsUnionAll = true
 	stmt.Union(statements...)

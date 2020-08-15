@@ -5,7 +5,7 @@ import "testing"
 func TestJSONBBuilder(t *testing.T) {
 	runTests(t, func(dbz *DB) []test {
 		return []test{
-			test{
+			{
 				"create a complex JSONB object",
 				dbz.
 					InsertInto("table").

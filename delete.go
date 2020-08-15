@@ -99,7 +99,7 @@ func (stmt *DeleteStmt) Exec() (res sql.Result, err error) {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	res, err = stmt.execer.Exec(asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return res, err
 }
@@ -113,7 +113,7 @@ func (stmt *DeleteStmt) ExecContext(ctx context.Context) (
 	asSQL, bindings := stmt.ToSQL(true)
 
 	res, err = stmt.execer.ExecContext(ctx, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return res, err
 }
@@ -127,7 +127,7 @@ func (stmt *DeleteStmt) GetRow(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Get(stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -144,7 +144,7 @@ func (stmt *DeleteStmt) GetRowContext(
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.GetContext(ctx, stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -156,7 +156,7 @@ func (stmt *DeleteStmt) GetAll(into interface{}) error {
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.Select(stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }
@@ -168,7 +168,7 @@ func (stmt *DeleteStmt) GetAllContext(ctx context.Context, into interface{}) err
 	asSQL, bindings := stmt.ToSQL(true)
 
 	err := sqlx.SelectContext(ctx, stmt.execer, into, asSQL, bindings...)
-	stmt.HandlerError(err)
+	stmt.HandleError(err)
 
 	return err
 }

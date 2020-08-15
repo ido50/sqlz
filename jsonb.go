@@ -4,15 +4,22 @@ import (
 	"strings"
 )
 
+// JSONBObject represents a PostgreSQL JSONB object.
 type JSONBObject struct {
+	// Bindings is the list of bindings for the object.
 	Bindings []interface{}
 }
 
+// JSONBBuilder represents usage of PostgreSQL's jsonb_build_array or
+// jsonb_build_object functions.
 type JSONBBuilder struct {
-	Array    bool
+	// Array indicates whether an array is being built, or an object
+	Array bool
+	// Bindings is the list of bindings for the function call
 	Bindings []interface{}
 }
 
+// BuildJSONBObject creates a call to jsonb_build_object.
 func BuildJSONBObject(in map[string]interface{}) (out JSONBBuilder) {
 	for _, key := range sortKeys(in) {
 		val := in[key]
@@ -22,6 +29,7 @@ func BuildJSONBObject(in map[string]interface{}) (out JSONBBuilder) {
 	return out
 }
 
+// BuildJSONBArray creates a call to jsonb_build_array.
 func BuildJSONBArray(in ...interface{}) (out JSONBBuilder) {
 	out.Array = true
 	out.Bindings = append(out.Bindings, in...)
@@ -29,6 +37,8 @@ func BuildJSONBArray(in ...interface{}) (out JSONBBuilder) {
 	return out
 }
 
+// Parse processes the JSONB object creator, returning SQL code that calls
+// the appropriate function.
 func (b JSONBBuilder) Parse() (asSQL string, bindings []interface{}) {
 	asSQL = "jsonb_build_"
 	if b.Array {

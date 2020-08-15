@@ -7,7 +7,7 @@ import (
 func TestWith(t *testing.T) {
 	runTests(t, func(dbz *DB) []test {
 		return []test{
-			test{
+			{
 				"WITH with one auxiliary query",
 				dbz.With(
 					dbz.Select("id").
@@ -23,7 +23,7 @@ func TestWith(t *testing.T) {
 				[]interface{}{3, 4},
 			},
 
-			test{
+			{
 				"WITH with multiple auxiliary queries",
 				dbz.With(
 					dbz.Select("id").
@@ -46,7 +46,7 @@ func TestWith(t *testing.T) {
 				[]interface{}{3, 3},
 			},
 
-			test{
+			{
 				"INSERT query that insert from a WITH-ed SELECT",
 				dbz.With(
 					dbz.Select("id").
