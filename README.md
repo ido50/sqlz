@@ -1,5 +1,5 @@
 <h2 align="center">sqlz</h2>
-<p align="center">flexible SQL query builder for Go.</p>
+<p align="center">Flexible SQL query builder for Go</p>
 <p align="center">
 	<a href="https://godoc.org/github.com/ido50/sqlz"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
@@ -9,7 +9,7 @@
 
 ---
 
-sqlz (pronounced "sequelize") is an un-opinionated, un-obtrusive SQL query builder for Go projects, based on [sqlx](https://github.com/jmoiron/sqlx/).
+**sqlz** (pronounced "sequelize") is an un-opinionated, un-obtrusive SQL query builder for Go projects, based on [sqlx](https://github.com/jmoiron/sqlx/).
 
 As opposed to other query builders, sqlz does not mean to bridge the gap between different SQL servers and implementations by
 providing a unified interface. Instead, it aims to support an extended SQL syntax that may be implementation-specific. For
@@ -17,14 +17,14 @@ example, if you wish to use PostgreSQL-specific features such as JSON operators 
 these without caring if the underlying database backend really is PostgreSQL. In other words, sqlz builds whatever queries
 you want it to build.
 
-sqlz is easy to integrate into existing code, as it does not require you to create your database connections through the
-sqlz API; in fact, it doesn't supply one. You can either use your existing `*sql.DB` connection or an `*sqlx.DB` connection,
+**sqlz** is easy to integrate into existing code, as it does not require you to create your database connections through the
+**sqlz** API; in fact, it doesn't supply one. You can either use your existing `*sql.DB` connection or an `*sqlx.DB` connection,
 so you can start writing new queries with sqlz without having to modify any existing code.
 
-sqlz leverages sqlx for easy loading of query results. Please make sure you are familiar with [how sqlx works](https://jmoiron.github.io/sqlx/)
+**sqlz** leverages **sqlx** for easy loading of query results. Please make sure you are familiar with [how sqlx works](https://jmoiron.github.io/sqlx/)
 in order to understand how row scanning is performed. You may need to add `db` struct tags to your Go structures.
 
-sqlz provides a comfortable API for running queries in a transaction, and will automatically commit or rollback the
+**sqlz** provides a comfortable API for running queries in a transaction, and will automatically commit or rollback the
 transaction as necessary.
 
 ## Install
@@ -38,7 +38,7 @@ go get -u github.com/ido50/sqlz
 Once installed, you can import sqlz into your Go packages. To build and execute queries with
 sqlz, you need to pass the underlying `*sql.DB` or `*sqlx.DB` objects. If using `database/sql`,
 you'll need to tell sqlz the name of the driver (so that it knows which placeholders to use
-when building queries); if using `jmoiron/sqlx`, this is not necessary.
+when building queries); if using `github.com/jmoiron/sqlx`, this is not necessary.
 
 ```go
 package main
@@ -240,22 +240,30 @@ sqlz.
     New(db, driver).
     Transactional(func(tx *sqlz.Tx) error {
         var id int64
-        err := tx.InsertInto("table").Columns("name").Values("some guy").GetRow(&id)
+        err := tx.
+            InsertInto("table").
+            Columns("name").
+            Values("some guy").
+            Returning("id").
+            GetRow(&id)
         if err != nil {
-            return err
+            return fmt.Errorf("failed inserting row: %w", err)
         }
 
-        _, err = tx.Update("other-table").Set("some-col", 4).Exec()
+        _, err = tx.
+            Update("other-table").
+            Set("some-col", 4).
+            Exec()
         if err != nil {
-            return err
+            return fmt.Errorf("failed updating row: %w", err)
         }
 
         return nil
     })
 ```
 
-If the function provided to the Transactional method returns an error, the transaction
-will be rolled back. Otherwise, it will be committed.
+If the function provided to the `Transactional` method returns an error, the
+transaction will be rolled back. Otherwise, it will be committed.
 
 ### Using strings as-is in queries
 
