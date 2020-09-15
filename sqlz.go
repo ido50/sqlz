@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -305,6 +306,12 @@ type ArrayCondition struct {
 	Right    interface{}
 }
 
+// Any creates an "ANY (array)" condition, to lookup for a value matching against an array of possible values
+// as similar to IN condition
+func Any(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{arr, "=", "ANY", value}
+}
+
 // EqAny creates an "= ANY" condition on an array column
 func EqAny(arr interface{}, value interface{}) ArrayCondition {
 	return ArrayCondition{value, "=", "ANY", arr}
@@ -399,22 +406,28 @@ func (cond SQLCondition) Parse() (asSQL string, bindings []interface{}) {
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (array ArrayCondition) Parse() (asSQL string, bindings []interface{}) {
-	var rightAsSQL, leftAsSQL string
+	rightAsSQL := "?"
+	leftAsSQL := "?"
 
 	if indirect, isIndirect := array.Left.(IndirectValue); isIndirect {
 		leftAsSQL = indirect.Reference
 		bindings = append(bindings, indirect.Bindings...)
 	} else {
-		leftAsSQL = "?"
 		bindings = append(bindings, array.Left)
 	}
 
-	switch array.Right.(type) {
+	switch right := array.Right.(type) {
 	case string:
 		rightAsSQL = fmt.Sprintf("%v", array.Right)
-	default:
-		rightAsSQL = "?"
+	case []int:
+		var values []string
+		for _, n := range right {
+			values = append(values, strconv.Itoa(n))
+		}
 
+		binds := fmt.Sprintf("'{%s}'", strings.Join(values, ","))
+		bindings = append(bindings, binds)
+	default:
 		bindings = append(bindings, array.Right)
 	}
 
