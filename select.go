@@ -573,6 +573,8 @@ func (stmt *SelectStmt) GetAllContext(ctx context.Context, into interface{}) err
 // total number of matching results. This is useful when
 // paginating results.
 func (stmt *SelectStmt) GetCount() (count int64, err error) {
+	defer stmt.HandleError(err)
+
 	countStmt := *stmt
 	countStmt.Columns = []string{"COUNT(*)"}
 	countStmt.LimitTo = 0
@@ -580,7 +582,32 @@ func (stmt *SelectStmt) GetCount() (count int64, err error) {
 	countStmt.OffsetRows = 0
 	countStmt.Ordering = []SQLStmt{}
 
-	err = countStmt.GetRow(&count)
+	for _, st := range countStmt.Unions {
+		st.Columns = []string{"COUNT(*)"}
+		st.LimitTo = 0
+		st.OffsetFrom = 0
+		st.OffsetRows = 0
+		st.Ordering = []SQLStmt{}
+	}
+
+	rows, err := countStmt.GetAllAsRows()
+	if err != nil {
+		return count, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stmtCount int64
+		err = rows.Scan(&stmtCount)
+
+		if err != nil {
+			return count, err
+		}
+
+		count += stmtCount
+	}
+
+	err = rows.Err()
 
 	return count, err
 }
