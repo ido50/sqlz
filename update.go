@@ -274,3 +274,12 @@ func ArrayRemove(name string, value interface{}) UpdateFunction {
 		Arguments: []interface{}{Indirect(name), value},
 	}
 }
+
+// ArrayConcat is an UpdateFunction for calling PostgreSQL's
+// array_cat function during an update.
+func ArrayConcat(name string, value interface{}) UpdateFunction {
+	return UpdateFunction{
+		Name:      "array_cat",
+		Arguments: []interface{}{Indirect(name), value},
+	}
+}
