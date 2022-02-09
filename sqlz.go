@@ -381,6 +381,10 @@ func NotLikeAll(arr interface{}, value interface{}) ArrayCondition {
 	return ArrayCondition{value, "NOT LIKE", "ALL", arr}
 }
 
+func NotLikeANY(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "NOT LIKE", "ANY", arr}
+}
+
 // Parse implements the WhereCondition interface, generating SQL from
 // the condition
 func (simple SimpleCondition) Parse() (asSQL string, bindings []interface{}) {
