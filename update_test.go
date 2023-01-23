@@ -62,6 +62,17 @@ func TestUpdate(t *testing.T) {
 				"UPDATE table SET something = replace(something, ?, '')",
 				[]interface{}{"prefix/"},
 			},
+			{
+				"update from values",
+				dbz.Update("table").FromValues(MultipleValues{
+					Values:  [][]interface{}{{"Tom", 20}, {"John", 3}},
+					As:      "values",
+					Columns: []string{"name", "age"},
+					Where:   []WhereCondition{Eq("values.name", Indirect("table.name"))},
+				}),
+				"UPDATE table SET table.name = values.name, table.age = values.age FROM (VALUES (?, ?), (?, ?)) AS values(name, age) WHERE values.name = table.name",
+				[]interface{}{"Tom", 20, "John", 3},
+			},
 		}
 	})
 }

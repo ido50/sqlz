@@ -19,6 +19,14 @@ type UpdateStmt struct {
 	execer          Ext
 	SelectStmt      *SelectStmt
 	SelectStmtAlias string
+	MultipleValues  MultipleValues
+}
+
+type MultipleValues struct {
+	Values  [][]interface{}
+	As      string
+	Columns []string
+	Where   []WhereCondition
 }
 
 // Update creates a new UpdateStmt object for
@@ -131,15 +139,44 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		}
 	}
 
+	if len(stmt.Updates) == 0 && len(stmt.MultipleValues.Columns) > 0 {
+		// add the set columns
+		for _, column := range stmt.MultipleValues.Columns {
+			updates = append(updates,
+				fmt.Sprintf("%s.%s = %s.%s", stmt.Table, column, stmt.MultipleValues.As, column))
+		}
+	}
+
 	clauses = append(clauses, "SET "+strings.Join(updates, ", "))
 
 	if stmt.SelectStmt != nil && stmt.SelectStmtAlias != "" {
 		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
 		selectSQL = "(" + selectSQL + ") AS " + stmt.SelectStmtAlias + " "
-
 		clauses = append(clauses, "FROM ")
 		clauses = append(clauses, selectSQL)
 		bindings = append(bindings, selectBindings...)
+	} else if len(stmt.MultipleValues.Values) > 0 {
+		// add the FROM
+		clauses = append(clauses, "FROM")
+		var multipleValues []string
+		for _, multipleVals := range stmt.MultipleValues.Values {
+			placeholders, bindingsToAdd := parseInsertValues(multipleVals)
+			bindings = append(bindings, bindingsToAdd...)
+			multipleValues = append(multipleValues, "("+strings.Join(placeholders, ", ")+")")
+		}
+
+		clauses = append(clauses, fmt.Sprintf("(VALUES %s) AS %s(%s)",
+			strings.Join(multipleValues, ", "),
+			stmt.MultipleValues.As,
+			strings.Join(stmt.MultipleValues.Columns, ", "),
+		))
+
+		if len(stmt.MultipleValues.Where) > 0 {
+			whereClause, whereBindings := parseConditions(stmt.MultipleValues.Where)
+			bindings = append(bindings, whereBindings...)
+			clauses = append(clauses, fmt.Sprintf("WHERE %s", whereClause))
+		}
+
 	}
 
 	if len(stmt.Conditions) > 0 {
@@ -237,6 +274,16 @@ func (stmt *UpdateStmt) GetAllContext(ctx context.Context, into interface{}) err
 	stmt.HandleError(err)
 
 	return err
+}
+
+// FromValues receives an array of interfaces in order to insert multiple records using the same insert statement
+func (stmt *UpdateStmt) FromValues(mv MultipleValues) *UpdateStmt {
+	stmt.MultipleValues.Values = append(stmt.MultipleValues.Values, mv.Values...)
+	stmt.MultipleValues.As = mv.As
+	stmt.MultipleValues.Columns = mv.Columns
+	stmt.MultipleValues.Where = mv.Where
+
+	return stmt
 }
 
 // UpdateFunction represents a function call in the context of
