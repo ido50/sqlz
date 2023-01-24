@@ -92,7 +92,7 @@ func (db *DB) TransactionalContext(
 
 	err = f(&Tx{Tx: tx, ErrHandlers: db.ErrHandlers})
 	if err != nil {
-		tx.Rollback() // nolint: errcheck
+		tx.Rollback() //nolint: errcheck
 		return err
 	}
 

@@ -56,7 +56,9 @@ func (tx *Tx) SetTimeout(d time.Duration) (res sql.Result, err error) {
 }
 
 // Local sets the configuration parameter locally in a transaction.
-//  The effect of SET LOCAL will last only till the end of the
+//
+//	The effect of SET LOCAL will last only till the end of the
+//
 // current transaction, whether committed or not.
 func (cmd *SetCmd) Local() *SetCmd {
 	cmd.level = "LOCAL"
@@ -64,7 +66,9 @@ func (cmd *SetCmd) Local() *SetCmd {
 }
 
 // Session sets the configuration parameter to the entire session.
-//  The effect of SET SESSION will last only till the end of the
+//
+//	The effect of SET SESSION will last only till the end of the
+//
 // current session. if issued within a transaction that is later aborted,
 // the effects of the SET command disappear when the transaction is rolled
 // back. Once the surrounding transaction is committed, the effects will persist

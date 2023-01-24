@@ -54,9 +54,9 @@ func TestSelect(t *testing.T) {
 			{
 				"select with array comparisons",
 				dbz.Select("*").From("table").Where(EqAny("array_col", 3), GtAll("other_array_col", 1), NeAny("yet_another_col", Indirect("NOW()")),
-					Any(Indirect("column"),[]int{1,2,3})),
+					Any(Indirect("column"), []int{1, 2, 3})),
 				"SELECT * FROM table WHERE ? = ANY(array_col) AND ? > ALL(other_array_col) AND NOW() <> ANY(yet_another_col) AND column = ANY(?)",
-				[]interface{}{3, 1 ,"'{1,2,3}'"},
+				[]interface{}{3, 1, "'{1,2,3}'"},
 			},
 
 			{

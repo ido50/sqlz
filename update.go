@@ -152,31 +152,14 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	if stmt.SelectStmt != nil && stmt.SelectStmtAlias != "" {
 		selectSQL, selectBindings := stmt.SelectStmt.ToSQL(false)
 		selectSQL = "(" + selectSQL + ") AS " + stmt.SelectStmtAlias + " "
+
 		clauses = append(clauses, "FROM ")
 		clauses = append(clauses, selectSQL)
 		bindings = append(bindings, selectBindings...)
 	} else if len(stmt.MultipleValues.Values) > 0 {
-		// add the FROM
-		clauses = append(clauses, "FROM")
-		var multipleValues []string
-		for _, multipleVals := range stmt.MultipleValues.Values {
-			placeholders, bindingsToAdd := parseInsertValues(multipleVals)
-			bindings = append(bindings, bindingsToAdd...)
-			multipleValues = append(multipleValues, "("+strings.Join(placeholders, ", ")+")")
-		}
-
-		clauses = append(clauses, fmt.Sprintf("(VALUES %s) AS %s(%s)",
-			strings.Join(multipleValues, ", "),
-			stmt.MultipleValues.As,
-			strings.Join(stmt.MultipleValues.Columns, ", "),
-		))
-
-		if len(stmt.MultipleValues.Where) > 0 {
-			whereClause, whereBindings := parseConditions(stmt.MultipleValues.Where)
-			bindings = append(bindings, whereBindings...)
-			clauses = append(clauses, fmt.Sprintf("WHERE %s", whereClause))
-		}
-
+		addClauses, addBindings := stmt.addUpdateFrom()
+		clauses = append(clauses, addClauses...)
+		bindings = append(bindings, addBindings...)
 	}
 
 	if len(stmt.Conditions) > 0 {
@@ -200,6 +183,35 @@ func (stmt *UpdateStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 	}
 
 	return asSQL, bindings
+}
+
+func (stmt *UpdateStmt) addUpdateFrom() (
+	clauses []string,
+	bindings []interface{},
+) {
+	clauses = append(clauses, "FROM")
+
+	multipleValues := make([]string, len(stmt.MultipleValues.Values))
+
+	for i, multipleVals := range stmt.MultipleValues.Values {
+		placeholders, bindingsToAdd := parseInsertValues(multipleVals)
+		bindings = append(bindings, bindingsToAdd...)
+		multipleValues[i] = "(" + strings.Join(placeholders, ", ") + ")"
+	}
+
+	clauses = append(clauses, fmt.Sprintf("(VALUES %s) AS %s(%s)",
+		strings.Join(multipleValues, ", "),
+		stmt.MultipleValues.As,
+		strings.Join(stmt.MultipleValues.Columns, ", "),
+	))
+
+	if len(stmt.MultipleValues.Where) > 0 {
+		whereClause, whereBindings := parseConditions(stmt.MultipleValues.Where)
+		bindings = append(bindings, whereBindings...)
+		clauses = append(clauses, fmt.Sprintf("WHERE %s", whereClause))
+	}
+
+	return clauses, bindings
 }
 
 // Exec executes the UPDATE statement, returning the standard

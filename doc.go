@@ -22,31 +22,31 @@
 // sqlz provides a comfortable API for running queries in a transaction, and
 // will automatically commit or rollback the transaction as necessary.
 //
-//		import (
-//			"fmt"
-//			"database/sql"
-//			"github.com/ido50/sqlz"
-//			_ "sql driver of choice"
-//		)
+//	import (
+//		"fmt"
+//		"database/sql"
+//		"github.com/ido50/sqlz"
+//		_ "sql driver of choice"
+//	)
 //
-//		func main() {
-//			db, err := sql.Open(driver, "dsn")
-//			if err != nil {
-//				panic(err)
-//			}
-//
-//			// find one row in the database and load it
-//			// into a struct variable
-//			var row someStruct
-//			err = sqlz.New(db, driver).  // if using sqlx: sqlz.Newx(dbx)
-//				Select("*").
-//				From("some-table").
-//				Where(sqlz.Eq("id", 1)).
-//				GetRow(&row)
-//			if err != nil {
-//				panic(err)
-//			}
-//
-//			fmt.Printf("%+v\n", row)
+//	func main() {
+//		db, err := sql.Open(driver, "dsn")
+//		if err != nil {
+//			panic(err)
 //		}
+//
+//		// find one row in the database and load it
+//		// into a struct variable
+//		var row someStruct
+//		err = sqlz.New(db, driver).  // if using sqlx: sqlz.Newx(dbx)
+//			Select("*").
+//			From("some-table").
+//			Where(sqlz.Eq("id", 1)).
+//			GetRow(&row)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		fmt.Printf("%+v\n", row)
+//	}
 package sqlz

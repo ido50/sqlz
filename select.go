@@ -377,8 +377,7 @@ func ForKeyShare() *LockClause {
 // ToSQL generates the SELECT statement's SQL and returns a list of
 // bindings. It is used internally by GetRow and GetAll, but is
 // exported if you wish to use it directly.
-// nolint: gocognit, gocyclo
-func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) {
+func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) { //nolint: gocognit, gocyclo
 	var clauses = []string{"SELECT"}
 
 	if stmt.IsDistinct {

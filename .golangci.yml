@@ -4,47 +4,43 @@ run:
 linters:
     disable-all: true
     enable:
-        - govet
-        - golint
-        - errcheck
-        - staticcheck
-        - unused
-        - gosimple
-        - structcheck
-        - varcheck
-        - ineffassign
-        - deadcode
-        - typecheck
-        - rowserrcheck
-        - stylecheck
-        - interfacer
-        - unconvert
-        - dupl
-        - goconst
-        - gocyclo
-        - gocognit
         - asciicheck
-        - goimports
-        - goheader
-        - maligned
-        - misspell
-        - lll
-        - unparam
-        - nakedret
-        - prealloc
-        - scopelint
-        - gocritic
+        - dupl
+        - errorlint
+        - errcheck
+        - exhaustive
+        - exportloopref
         - funlen
+        - gocognit
+        - goconst
+        - gocritic
+        - gocyclo
+        - goerr113
+        - goheader
+        - goimports
+        - gomnd
+        - goprintffuncname
+        - gosec
+        - gosimple
+        - govet
+        - ineffassign
+        - lll
+        - misspell
+        - nakedret
+        - nestif
+        - nolintlint
+        - prealloc
+        - rowserrcheck
+        - sqlclosecheck
+        - staticcheck
+        - stylecheck
+        - typecheck
+        - unconvert
+        - unparam
+        - unused
+        - wastedassign
         - whitespace
         - wsl
-        - goprintffuncname
-        - gomnd
-        - goerr113
-        - nestif
-        - exportloopref
-        - exhaustive
-        - sqlclosecheck
-        - nolintlint
 linters-settings:
     funlen:
         lines: 150
