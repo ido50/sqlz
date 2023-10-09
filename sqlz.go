@@ -377,6 +377,11 @@ func LikeAny(arr interface{}, value interface{}) ArrayCondition {
 	return ArrayCondition{value, "LIKE", "ANY", arr}
 }
 
+// ILikeAny creates an "ILikeAny ANY" condition on an array
+func ILikeAny(arr interface{}, value interface{}) ArrayCondition {
+	return ArrayCondition{value, "ILIKE", "ANY", arr}
+}
+
 func NotLikeAll(arr interface{}, value interface{}) ArrayCondition {
 	return ArrayCondition{value, "NOT LIKE", "ALL", arr}
 }
