@@ -79,10 +79,12 @@ func (stmt *WithStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}) 
 	bindings = append(bindings, mainBindings...)
 
 	asSQL = strings.Join(clauses, " ")
-	if db, ok := stmt.execer.(*sqlx.DB); ok {
-		asSQL = db.Rebind(asSQL)
-	} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
-		asSQL = tx.Rebind(asSQL)
+	if rebind {
+		if db, ok := stmt.execer.(*sqlx.DB); ok {
+			asSQL = db.Rebind(asSQL)
+		} else if tx, ok := stmt.execer.(*sqlx.Tx); ok {
+			asSQL = tx.Rebind(asSQL)
+		}
 	}
 
 	return asSQL, bindings
