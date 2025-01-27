@@ -52,6 +52,7 @@ type SelectStmt struct {
 	queryer         Queryer
 	DistinctColumns []string
 	Columns         []string
+	IndirectColumns []IndirectValue
 	Joins           []JoinClause
 	Conditions      []WhereCondition
 	Ordering        []SQLStmt
@@ -181,6 +182,13 @@ func (tx *Tx) Select(cols ...string) *SelectStmt {
 		queryer:   tx.Tx,
 		Statement: &Statement{tx.ErrHandlers},
 	}
+}
+
+// InDirectColumns adds sqlz.IndirectValue columns to the statement.
+// This can be useful when using database function inside the select statement
+func (stmt *SelectStmt) InDirectColumns(cols ...IndirectValue) *SelectStmt {
+	stmt.IndirectColumns = append([]IndirectValue{}, cols...)
+	return stmt
 }
 
 // Distinct marks the statements as a SELECT DISTINCT
@@ -387,10 +395,21 @@ func (stmt *SelectStmt) ToSQL(rebind bool) (asSQL string, bindings []interface{}
 		}
 	}
 
-	if len(stmt.Columns) == 0 {
+	if len(stmt.Columns) == 0 && len(stmt.IndirectColumns) == 0 {
 		clauses = append(clauses, "*")
 	} else {
-		clauses = append(clauses, strings.Join(stmt.Columns, ", "))
+		columnsClauses := make([]string, 0)
+		if len(stmt.Columns) > 0 {
+			columnsClauses = append(columnsClauses, stmt.Columns...)
+		}
+
+		if len(stmt.IndirectColumns) > 0 {
+			for _, indirectColumn := range stmt.IndirectColumns {
+				bindings = append(bindings, indirectColumn.Bindings...)
+				columnsClauses = append(columnsClauses, indirectColumn.Reference)
+			}
+		}
+		clauses = append(clauses, strings.Join(columnsClauses, ", "))
 	}
 
 	if len(stmt.Table) > 0 {
